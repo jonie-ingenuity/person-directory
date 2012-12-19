@@ -1,0 +1,109 @@
+QUESTIONS
+    - are attribute names case insensitive? YES according to PD1.5 behavior
+
+
+api - public interface
+    need to think/design the query builder API, something fluent would be good
+        http://static.springsource.org/spring-ldap/site/apidocs/org/springframework/ldap/filter/package-frame.html
+    do we need an Attribute class or are Attributes just Strings?
+    
+    
+Complex queries and multiple attribute sources
+    default root query object ORs its parts together?
+    break root query object up by OR clause?
+    the problem:
+        Given a query like (firstName=Jane && (isStudent=Y || lastName=Doe))
+        How do we handle sources that do not support all of the attributes in the query?
+            do a multi pass query, query sources that support all attributes first
+            query sources that support a subset of the attributes second, during merge filter these in code using the attributes that were not passed to the source
+            query non-searchable sources
+            
+General Query Logic
+    attribute query
+        ex: by username, [foo=bar, name=smith, ....]
+        Run MS & PS sources
+            turn map into OR() criteria for MS
+        Run S sources once per existing result
+    criteria query
+        ex: (firstName=jane && (lastName==smith || lastName=doe))
+        Run MS sources
+            merge results
+        Run PS sources
+            merge results
+        Run S sources once per existing result
+            
+attribute source classes - how do we tell/config the difference?
+    fully searchable (MS) - CriteriaSearchAttributeSource
+        uses a query template (supports arbitrary logic)
+        ldap or primary use directories go here
+    partial searchable (PS) - SimpleSearchAttributeSource
+        uses named placeholders but still can return multiple people for one query
+        small associated sources go here
+    single-person only (S)
+        will only ever return a single result ... is this useful?
+        in=memory sources like for shib go here
+
+
+spi - what code in support implements to provide data
+
+
+core - big ugly guts
+    core code that does
+        dependency tree calc of sources
+        determine query order and potential for parallelism, probably better to figure it with always parallel and having "block" spots that wait for other sources to complete
+        caching of results from each source
+        handling of query timeouts
+        merging results from various sources
+        mapping attribute names from the API side to the SPI side
+        jmx metrics for per-source usage & performance
+        primaryId
+            Used when a find person by primary id query is run
+            Used to merge data from multiple sources (each result must have a primaryId set)
+        
+    add a list of AttributeSourceFilter
+        these are called in order (sorted by ordered)
+        if any filter returns false the filtered source is not executed
+        filterchain style API that allows for modification of search?
+        
+    dependency tree calculation on configured attribute sources
+        needs to fail to init if something is wrong with the tree
+        this probably needs to be calculated and cached for each query since the tree will look different every time based on the input
+
+    caching of results - part of XML config support
+        for each configured source, set cache name or reference to Ehcache bean
+        optional cache name/ref for misses
+        optional cache name/ref for exceptions
+
+    query timeout - part of XML config support
+        set maximum wait for query result
+        set behavior on timeout? (ignore, fail)
+        
+    merge behavior - part of XML config
+        does it work for each source to have a "prepend/append/overwrite" flag?
+        if so we probably need support for Spring's Orderable on the SPI impl
+        
+    attribute name mapping - part of XML config support
+        for each configured source, option to allow for saying api attr "username" is actually "uid" in this spi
+        
+    attribute lists
+        - in the config are these the PD side or the source side of the attr mapping?
+        - at least one required or optional search attribute must be specified
+        required search
+            ALL of these attributes must be include in a query for this source to be able to run the query 
+        optional search
+            This plus the required set make up the collection of attributes that can be used to search, attributes outside this set are ignored
+        available return 
+            The list of attributes the source returns, this is a best-effort set and the source may return more attributes than are named in the set
+
+support
+    attribute sources
+        jdbc (MS,MP,S)
+            single row
+            multi row
+        ldap (MS,MP,S)
+        xml (MS)
+        request attribute (S)
+    filters
+        regex
+        spel
+
