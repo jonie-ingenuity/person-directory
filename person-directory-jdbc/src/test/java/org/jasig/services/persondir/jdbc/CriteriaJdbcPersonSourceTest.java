@@ -2,6 +2,7 @@ package org.jasig.services.persondir.jdbc;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import java.util.LinkedList;
@@ -10,32 +11,30 @@ import java.util.List;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.ResultSetExtractor;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 
 import com.google.common.collect.ImmutableList;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CriteriaJdbcPersonSourceTest {
     @InjectMocks private CriteriaJdbcPersonSource personSource;
-    @Mock private NamedParameterJdbcOperations jdbcOperations;
+    @Mock private JdbcOperations jdbcOperations;
     @Mock private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
     
-    @Ignore
     @Test
-    public void test() {
-        final String sql = "SELECT NAME FROM USERS WHERE {0}";
+    public void testSearchForAttributes() {
+        final String sql = "SELECT NAME FROM USERS WHERE {}";
         final Criteria criteria = CriteriaBuilder.eq("username", "jdoe");
         
         personSource.setQueryTemplate(sql);
         
-//        when(jdbcOperations.query(sql, searchAttributes, this.resultSetExtractor)).thenReturn(Collections.<PersonAttributes>emptyList());
+        when(jdbcOperations.query("SELECT NAME FROM USERS WHERE  username = ?", new Object[] { "jdoe" }, this.resultSetExtractor)).thenReturn(Collections.<PersonAttributes>emptyList());
         
         final List<PersonAttributes> result = personSource.searchForAttributes(criteria);
         

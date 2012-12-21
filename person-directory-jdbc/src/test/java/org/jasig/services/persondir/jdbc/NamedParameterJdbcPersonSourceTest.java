@@ -34,7 +34,7 @@ public class NamedParameterJdbcPersonSourceTest {
         
         when(jdbcOperations.query(sql, searchAttributes, this.resultSetExtractor)).thenReturn(Collections.<PersonAttributes>emptyList());
         
-        final List<PersonAttributes> result = personSource.findPersonAttributes(searchAttributes);
+        final List<PersonAttributes> result = personSource.searchForAttributes(searchAttributes);
         
         assertNotNull(result);
         assertEquals(Collections.emptyList(), result);

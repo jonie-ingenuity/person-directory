@@ -36,7 +36,7 @@ public class NamedParameterJdbcPersonSource implements SimpleSearchableAttribute
     }
 
     @Override
-    public List<PersonAttributes> findPersonAttributes(Map<String, Object> searchAttributes) {
+    public List<PersonAttributes> searchForAttributes(Map<String, Object> searchAttributes) {
         return this.jdbcOperations.query(this.queryTemplate, searchAttributes, this.resultSetExtractor);
     }
 }

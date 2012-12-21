@@ -11,12 +11,12 @@ import org.jasig.services.persondir.PersonAttributes;
  * 
  * @author Eric Dalquist
  */
-public interface SimpleSearchableAttributeSource {
+public interface SimpleSearchableAttributeSource extends BaseAttributeSource {
     /**
      * Searches for multiple people via the map of attributes, always returns an immutable list
      * 
      * @param searchAttributes
      * @return
      */
-    List<PersonAttributes> findPersonAttributes(Map<String, Object> searchAttributes);
+    List<PersonAttributes> searchForAttributes(Map<String, Object> searchAttributes);
 }

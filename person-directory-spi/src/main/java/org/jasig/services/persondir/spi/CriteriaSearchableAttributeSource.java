@@ -10,7 +10,7 @@ import org.jasig.services.persondir.criteria.Criteria;
  * 
  * @author Eric Dalquist
  */
-public interface CriteriaSearchableAttributeSource {
+public interface CriteriaSearchableAttributeSource extends BaseAttributeSource {
     /**
      * Searches for multiple people via the criteria, always returns an immutable list
      * 

@@ -10,12 +10,12 @@ import org.jasig.services.persondir.PersonAttributes;
  * 
  * @author Eric Dalquist
  */
-public interface SimpleAttributeSource {
+public interface SimpleAttributeSource extends BaseAttributeSource {
     /**
      * Gets the attributes for a specific person
      * 
      * @param criteria The criteria to use to find the attributes
      * @return The attributes for a specific person, returns null if no matching person was found
      */
-    PersonAttributes findPersonAttributes(Map<String, String> searchAttributes);
+    PersonAttributes findPersonAttributes(Map<String, Object> searchAttributes);
 }

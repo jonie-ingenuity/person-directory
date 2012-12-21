@@ -15,5 +15,9 @@
         <artifactId>person-directory-api</artifactId>
         <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>net.sf.ehcache</groupId>
+      <artifactId>ehcache-core</artifactId>
+    </dependency>
   </dependencies>
 </project>

@@ -3,6 +3,8 @@ package org.jasig.services.persondir.jdbc;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.BinaryLogicCriteria;
@@ -19,10 +21,20 @@ import org.springframework.jdbc.core.ResultSetExtractor;
  * @author Eric Dalquist
  */
 public class CriteriaJdbcPersonSource implements CriteriaSearchableAttributeSource {
+    public static final String DEFAULT_CRITERIA_PLACEHOLDER_PATTERN = "{}";
+    
     private JdbcOperations jdbcOperations;
     private String queryTemplate;
     private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
+    private Pattern criteriaPlaceholderPattern = Pattern.compile(Pattern.quote(DEFAULT_CRITERIA_PLACEHOLDER_PATTERN));
     
+    public void setCriteriaPlaceholder(String criteriaPlaceholderPattern) {
+        this.criteriaPlaceholderPattern = Pattern.compile(Pattern.quote(criteriaPlaceholderPattern));
+    }
+    public void setCriteriaPlaceholderPattern(String criteriaPlaceholderPattern) {
+        this.criteriaPlaceholderPattern = Pattern.compile(criteriaPlaceholderPattern);
+    }
+
     public void setJdbcOperations(JdbcOperations jdbcOperations) {
         this.jdbcOperations = jdbcOperations;
     }
@@ -41,9 +53,10 @@ public class CriteriaJdbcPersonSource implements CriteriaSearchableAttributeSour
         final LinkedList<Object> params = new LinkedList<Object>();
         final String sqlCriteria = this.generateSqlCriteria(criteria, params);
         
-        //TODO insert sqlCriteria into queryTemplate
+        final Matcher queryTemplateMatcher = criteriaPlaceholderPattern.matcher(this.queryTemplate);
+        final String query = queryTemplateMatcher.replaceAll(sqlCriteria);
         
-        return this.jdbcOperations.query(queryTemplate, params.toArray(), this.resultSetExtractor);
+        return this.jdbcOperations.query(query, params.toArray(), this.resultSetExtractor);
     }
     
     protected String generateSqlCriteria(Criteria criteria, List<Object> params) {
