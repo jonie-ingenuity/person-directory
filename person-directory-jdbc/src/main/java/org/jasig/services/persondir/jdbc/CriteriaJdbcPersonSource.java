@@ -1,8 +1,10 @@
 package org.jasig.services.persondir.jdbc;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,7 +49,12 @@ public class CriteriaJdbcPersonSource implements CriteriaSearchableAttributeSour
             ResultSetExtractor<List<PersonAttributes>> resultSetExtractor) {
         this.resultSetExtractor = resultSetExtractor;
     }
-
+    
+    @Override
+    public Set<String> getAvailableAttributes() {
+        return Collections.emptySet();
+    }
+    
     @Override
     public List<PersonAttributes> searchForAttributes(Criteria criteria) {
         final LinkedList<Object> params = new LinkedList<Object>();

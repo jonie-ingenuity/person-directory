@@ -30,7 +30,7 @@ public class ConfigBuilderTest {
     
     @Test
     public void testConfigBuilder() {
-        final PersonDirectoryJavaConfigBuilder configBuilder = new PersonDirectoryJavaConfigBuilder("username");
+        final PersonDirectoryConfigBuilder configBuilder = new PersonDirectoryConfigBuilder("username");
         
         configBuilder
             .setMergeCacheName("org.jasig.services.persondir.USER_INFO.merge")

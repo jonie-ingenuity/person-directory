@@ -1,7 +1,9 @@
 package org.jasig.services.persondir.jdbc;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
@@ -35,6 +37,11 @@ public class NamedParameterJdbcPersonSource implements SimpleSearchableAttribute
         this.resultSetExtractor = resultSetExtractor;
     }
 
+    @Override
+    public Set<String> getAvailableAttributes() {
+        return Collections.emptySet();
+    }
+    
     @Override
     public List<PersonAttributes> searchForAttributes(Map<String, Object> searchAttributes) {
         return this.jdbcOperations.query(this.queryTemplate, searchAttributes, this.resultSetExtractor);
