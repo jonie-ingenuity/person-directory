@@ -12,6 +12,12 @@
   <artifactId>person-directory-parent</artifactId>
   <version>2.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
+    
+  <scm>
+    <connection>scm:git:git://github.com/Jasig/person-directory.git</connection>
+    <developerConnection>scm:git:git@github.com:Jasig/person-directory.git</developerConnection>
+    <url>https://github.com/Jasig/person-directory</url>
+  </scm>
 
   <modules>
     <module>person-directory-api</module>
@@ -114,5 +120,33 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
+
+    <profiles>
+        <!-- 
+         | Used by the continuous integrations server to deploy the project site.
+         +-->
+        <profile>
+            <id>ci-local-site</id>
+            <distributionManagement>
+                <site>
+                    <id>ci-local-site</id>
+                    <url>${jasig-site-ci-dist-base}/person-directory/${project.version}</url>
+                </site>
+            </distributionManagement>
+        </profile>
+        <!-- 
+         | Should be activated manually by a developer that wishes to deploy a maven site for
+         | the project
+         +-->
+        <profile>
+            <id>manual-site</id>
+            <distributionManagement>
+                <site>
+                    <id>developer.jasig</id>
+                    <url>${jasig-site-dist-base}/person-directory/${project.version}</url>
+                </site>
+            </distributionManagement>
+        </profile>
+    </profiles>
 
 </project>
