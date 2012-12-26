@@ -9,6 +9,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.springframework.beans.factory.BeanFactory;
 
 import com.google.common.collect.ImmutableSet;
 
@@ -28,9 +29,11 @@ public class ConfigBuilderTest {
     @Mock private AttributeSourceFilter isGraduatingFilter;
     @Mock private AttributeSourceFilter hasUddsFilter;
     
+    @Mock private BeanFactory beanFactory;
+    
     @Test
     public void testConfigBuilder() {
-        final PersonDirectoryConfigBuilder configBuilder = new PersonDirectoryConfigBuilder("username");
+        final PersonDirectoryBuilder configBuilder = PersonDirectoryConfigFactory.newPersonDirectoryBuilder("username");
         
         configBuilder
             .setMergeCacheName("org.jasig.services.persondir.USER_INFO.merge")
@@ -156,6 +159,6 @@ public class ConfigBuilderTest {
             ;
         
         
-        configBuilder.build();
+        configBuilder.build(beanFactory);
     }
 }

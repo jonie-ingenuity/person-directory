@@ -6,6 +6,7 @@ import java.util.Set;
 import net.sf.ehcache.Ehcache;
 
 import org.jasig.services.persondir.PersonDirectory;
+import org.jasig.services.persondir.core.PersonDirectoryImpl;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
@@ -36,8 +37,7 @@ final class PersonDirectoryConfigBuilder
     private volatile String mergeCacheName;
     private volatile Ehcache mergeCache;
 
-    //TODO static method to call this
-    public PersonDirectoryConfigBuilder(String primaryIdAttribute) {
+    PersonDirectoryConfigBuilder(String primaryIdAttribute) {
         super(PersonDirectoryBuilder.class);
         
         Assert.notNull(primaryIdAttribute, "primaryIdAttribute can not be null");
@@ -95,27 +95,31 @@ final class PersonDirectoryConfigBuilder
         return this.getThis();
     }
     
+    @Override
     public SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source) {
         final SimpleAttributeSourceConfigBuilder sourceBuilder = new SimpleAttributeSourceConfigBuilder(source);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
     }
     
+    @Override
     public SimpleSearchableAttributeSourceBuilder addAttributeSource(SimpleSearchableAttributeSource source) {
         final SimpleSearchableAttributeSourceConfigBuilder sourceBuilder = new SimpleSearchableAttributeSourceConfigBuilder(source);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
     }
     
+    @Override
     public CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source) {
         final CriteriaSearchableAttributeSourceConfigBuilder sourceBuilder = new CriteriaSearchableAttributeSourceConfigBuilder(source);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
     }
     
-    public PersonDirectory build() {
-        //TODO this probably needs an app context reference
-        return null;
+    @Override
+    public PersonDirectory build(BeanFactory beanFactory) {
+        this.resolveConfiguration(beanFactory);
+        return new PersonDirectoryImpl(this);
     }
     
     @Override

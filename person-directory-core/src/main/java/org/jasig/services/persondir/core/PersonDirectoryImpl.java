@@ -4,25 +4,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import net.sf.ehcache.Ehcache;
-
 import org.jasig.services.persondir.Person;
 import org.jasig.services.persondir.PersonDirectory;
+import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.criteria.Criteria;
-import org.jasig.services.persondir.spi.BaseAttributeSource;
 
 import com.google.common.collect.ImmutableMap;
 
 public class PersonDirectoryImpl implements PersonDirectory {
     
-    //TODO this needs to be the configured source ...
-    private final Set<BaseAttributeSource> sourceBuilders = null;
-    private final String primaryIdAttribute = null;
-    private final Ehcache mergeCache = null;
+    private final PersonDirectoryConfig config;
+    //TODO probably break out the individual sources by simple/search/criteria types
+    
+    public PersonDirectoryImpl(PersonDirectoryConfig config) {
+        this.config = config;
+    }
 
     @Override
     public Person findPerson(String primaryId) {
-        final Map<String, Object> attributes = ImmutableMap.<String, Object>of(this.primaryIdAttribute, primaryId);
+        final Map<String, Object> attributes = ImmutableMap.<String, Object>of(config.getPrimaryIdAttribute(), primaryId);
         
         final List<Person> results = this.searchForPeople(attributes);
         
