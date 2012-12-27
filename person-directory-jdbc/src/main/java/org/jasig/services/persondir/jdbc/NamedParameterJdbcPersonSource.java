@@ -5,26 +5,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.sql.DataSource;
+
 import org.jasig.services.persondir.PersonAttributes;
+import org.jasig.services.persondir.spi.AttributeQuery;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
-import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+
+import com.google.common.base.Function;
 
 /**
  * @author Eric Dalquist
  */
 public class NamedParameterJdbcPersonSource implements SimpleSearchableAttributeSource {
-    private NamedParameterJdbcOperations jdbcOperations;
+    private PerQueryCustomizableJdbcOperations jdbcOperations;
     private String queryTemplate;
     private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
     
-    public void setJdbcOperations(JdbcOperations jdbcOperations) {
-        this.jdbcOperations = new NamedParameterJdbcTemplate(jdbcOperations);
+    public void setDataSource(DataSource dataSource) {
+        this.jdbcOperations = new PerQueryCustomizableJdbcTemplate(dataSource);
     }
-
-    public void setNamedParameterJdbcOperations(NamedParameterJdbcOperations jdbcOperations) {
+    
+    protected void setJdbcOperations(PerQueryCustomizableJdbcOperations jdbcOperations) {
         this.jdbcOperations = jdbcOperations;
     }
 
@@ -32,8 +35,7 @@ public class NamedParameterJdbcPersonSource implements SimpleSearchableAttribute
         this.queryTemplate = queryTemplate;
     }
     
-    public void setResultSetExtractor(
-            ResultSetExtractor<List<PersonAttributes>> resultSetExtractor) {
+    public void setResultSetExtractor(ResultSetExtractor<List<PersonAttributes>> resultSetExtractor) {
         this.resultSetExtractor = resultSetExtractor;
     }
 
@@ -43,7 +45,15 @@ public class NamedParameterJdbcPersonSource implements SimpleSearchableAttribute
     }
     
     @Override
-    public List<PersonAttributes> searchForAttributes(Map<String, Object> searchAttributes) {
-        return this.jdbcOperations.query(this.queryTemplate, searchAttributes, this.resultSetExtractor);
+    public List<PersonAttributes> searchForAttributes(AttributeQuery<Map<String, Object>> query) {
+        final Map<String, Object> searchAttributes = query.getQuery();
+        
+        return this.jdbcOperations.doNamedWithSettings(new Function<NamedParameterJdbcOperations, List<PersonAttributes>>() {
+            public List<PersonAttributes> apply(NamedParameterJdbcOperations jdbcOperations) {
+                return jdbcOperations.query(queryTemplate, searchAttributes, resultSetExtractor);
+            }
+        }, 
+        query.getMaxResults(), 
+        query.getQueryTimeout());
     }
 }

@@ -239,6 +239,11 @@ abstract class AbstractAttributeSourceConfigBuilder<
         }
         return this.getThis();
     }
+    
+    @Override
+    public final int getOrder() {
+        return this.mergeOrder;
+    }
 
     @Override
     public final S getAttributeSource() {

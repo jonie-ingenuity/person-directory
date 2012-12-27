@@ -14,8 +14,8 @@ public interface SimpleAttributeSource extends BaseAttributeSource {
     /**
      * Gets the attributes for a specific person
      * 
-     * @param criteria The criteria to use to find the attributes
+     * @param query The query to execute
      * @return The attributes for a specific person, returns null if no matching person was found
      */
-    PersonAttributes findPersonAttributes(Map<String, Object> searchAttributes);
+    PersonAttributes findPersonAttributes(AttributeQuery<Map<String, Object>> query);
 }

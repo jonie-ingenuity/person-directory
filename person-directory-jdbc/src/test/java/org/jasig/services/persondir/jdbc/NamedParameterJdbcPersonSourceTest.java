@@ -2,6 +2,8 @@ package org.jasig.services.persondir.jdbc;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -9,21 +11,23 @@ import java.util.List;
 import java.util.Map;
 
 import org.jasig.services.persondir.PersonAttributes;
+import org.jasig.services.persondir.spi.AttributeQuery;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 import org.springframework.jdbc.core.ResultSetExtractor;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableMap;
 
 @RunWith(MockitoJUnitRunner.class)
 public class NamedParameterJdbcPersonSourceTest {
     @InjectMocks private NamedParameterJdbcPersonSource personSource;
-    @Mock private NamedParameterJdbcOperations jdbcOperations;
+    @Mock private PerQueryCustomizableJdbcOperations jdbcOperations;
     @Mock private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
+    @Mock private AttributeQuery<Map<String, Object>> query;
     
     @Test
     public void test() {
@@ -32,9 +36,10 @@ public class NamedParameterJdbcPersonSourceTest {
         
         personSource.setQueryTemplate(sql);
         
-        when(jdbcOperations.query(sql, searchAttributes, this.resultSetExtractor)).thenReturn(Collections.<PersonAttributes>emptyList());
+        when(jdbcOperations.doNamedWithSettings(any(Function.class), anyInt(), anyInt())).thenReturn(Collections.<PersonAttributes>emptyList());
+        when(query.getQuery()).thenReturn(searchAttributes);
         
-        final List<PersonAttributes> result = personSource.searchForAttributes(searchAttributes);
+        final List<PersonAttributes> result = personSource.searchForAttributes(query);
         
         assertNotNull(result);
         assertEquals(Collections.emptyList(), result);

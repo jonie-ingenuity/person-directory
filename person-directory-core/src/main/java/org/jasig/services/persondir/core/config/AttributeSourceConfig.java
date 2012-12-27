@@ -9,8 +9,9 @@ import net.sf.ehcache.Ehcache;
 
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.filter.AttributeSourceFilter;
+import org.springframework.core.Ordered;
 
-public interface AttributeSourceConfig<S extends BaseAttributeSource> {
+public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Ordered {
 
     S getAttributeSource();
 

@@ -15,8 +15,8 @@ public interface SimpleSearchableAttributeSource extends BaseAttributeSource {
     /**
      * Searches for multiple people via the map of attributes, always returns an immutable list
      * 
-     * @param searchAttributes
+     * @param query The query to execute
      * @return
      */
-    List<PersonAttributes> searchForAttributes(Map<String, Object> searchAttributes);
+    List<PersonAttributes> searchForAttributes(AttributeQuery<Map<String, Object>> query);
 }

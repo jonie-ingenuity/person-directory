@@ -2,6 +2,8 @@ package org.jasig.services.persondir.jdbc;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
@@ -11,6 +13,7 @@ import java.util.List;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
+import org.jasig.services.persondir.spi.AttributeQuery;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
@@ -19,13 +22,16 @@ import org.mockito.runners.MockitoJUnitRunner;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 
 @RunWith(MockitoJUnitRunner.class)
 public class CriteriaJdbcPersonSourceTest {
     @InjectMocks private CriteriaJdbcPersonSource personSource;
+    @Mock private PerQueryCustomizableJdbcOperations customizableJdbcOperations;
     @Mock private JdbcOperations jdbcOperations;
     @Mock private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
+    @Mock private AttributeQuery<Criteria> query;
     
     @Test
     public void testSearchForAttributes() {
@@ -34,9 +40,10 @@ public class CriteriaJdbcPersonSourceTest {
         
         personSource.setQueryTemplate(sql);
         
-        when(jdbcOperations.query("SELECT NAME FROM USERS WHERE  username = ?", new Object[] { "jdoe" }, this.resultSetExtractor)).thenReturn(Collections.<PersonAttributes>emptyList());
+        when(query.getQuery()).thenReturn(criteria);
+        when(customizableJdbcOperations.doWithSettings(any(Function.class), anyInt(), anyInt())).thenReturn(Collections.<PersonAttributes>emptyList());
         
-        final List<PersonAttributes> result = personSource.searchForAttributes(criteria);
+        final List<PersonAttributes> result = personSource.searchForAttributes(query);
         
         assertNotNull(result);
         assertEquals(Collections.emptyList(), result);

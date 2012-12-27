@@ -14,8 +14,8 @@ public interface CriteriaSearchableAttributeSource extends BaseAttributeSource {
     /**
      * Searches for multiple people via the criteria, always returns an immutable list
      * 
-     * @param criteria
+     * @param query The query to execute
      * @return
      */
-    List<PersonAttributes> searchForAttributes(Criteria criteria);
+    List<PersonAttributes> searchForAttributes(AttributeQuery<Criteria> query);
 }
