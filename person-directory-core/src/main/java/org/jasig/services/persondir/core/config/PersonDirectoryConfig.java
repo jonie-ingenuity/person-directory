@@ -1,6 +1,7 @@
 package org.jasig.services.persondir.core.config;
 
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import net.sf.ehcache.Ehcache;
 
@@ -9,7 +10,11 @@ public interface PersonDirectoryConfig {
     
     String getPrimaryIdAttribute();
     
-    String getMergeCacheName();
-    
     Ehcache getMergeCache();
+    
+    ExecutorService getExecutorService();
+    
+    int getDefaultMaxResults();
+    
+    int getDefaultQueryTimeout();
 }

@@ -17,6 +17,7 @@ public interface PersonDirectory {
      * match is found.
      */
     Person findPerson(String primaryId);
+    Person findPerson(AttributeQuery<String> query);
     
     /**
      * Do a simple search for people using an attribute map, this is equivalent to doing
@@ -24,14 +25,16 @@ public interface PersonDirectory {
      * 
      * @return Immutable list of results
      */
-    List<Person> searchForPeople(Map<String, Object> attributes);
+    List<Person> simpleSearchForPeople(Map<String, Object> attributes);
+    List<Person> simpleSearchForPeople(AttributeQuery<Map<String, Object>> query);
     
     /**
      * Do a {@link Criteria} search. This allows for more complex search logic to be used.
      * 
      * @return Immutable list of results
      */
-    List<Person> searchForPeople(Criteria query);
+    List<Person> criteriaSearchForPeople(Criteria query);
+    List<Person> criteriaSearchForPeople(AttributeQuery<Criteria> query);
     
     /**
      * @return Set of attribute names that can be used when searching for a {@link Person}

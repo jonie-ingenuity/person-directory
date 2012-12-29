@@ -17,15 +17,9 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Or
 
     List<AttributeSourceFilter> getFilters();
 
-    String getResultCacheName();
-
     Ehcache getResultCache();
 
-    String getMissCacheName();
-
     Ehcache getMissCache();
-
-    String getErrorCacheName();
 
     Ehcache getErrorCache();
 
@@ -41,9 +35,14 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Or
 
     Map<String, Collection<String>> getAttributeMapping();
 
-    Set<String> getRequiredAttributes();
+    Set<String> getRequiredQueryAttributes();
 
-    Set<String> getOptionalAttributes();
+    Set<String> getOptionalQueryAttributes();
+    
+    /**
+     * @return Superset of {@link #getRequiredQueryAttributes()} and {@link #getOptionalQueryAttributes()}
+     */
+    Set<String> getQueryAttributes();
 
     Set<String> getAvailableAttributes();
 

@@ -2,6 +2,7 @@ package org.jasig.services.persondir.spi;
 
 import java.util.List;
 
+import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.Criteria;
 

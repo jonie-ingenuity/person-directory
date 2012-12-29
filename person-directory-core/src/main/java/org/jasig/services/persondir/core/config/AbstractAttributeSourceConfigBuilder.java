@@ -256,28 +256,13 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
 
     @Override
-    public final String getResultCacheName() {
-        return resultCacheName;
-    }
-
-    @Override
     public final Ehcache getResultCache() {
         return resultCache;
     }
 
     @Override
-    public final String getMissCacheName() {
-        return missCacheName;
-    }
-
-    @Override
     public final Ehcache getMissCache() {
         return missCache;
-    }
-
-    @Override
-    public final String getErrorCacheName() {
-        return errorCacheName;
     }
 
     @Override
@@ -316,12 +301,12 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
 
     @Override
-    public final Set<String> getRequiredAttributes() {
+    public final Set<String> getRequiredQueryAttributes() {
         return requiredAttributes;
     }
 
     @Override
-    public final Set<String> getOptionalAttributes() {
+    public final Set<String> getOptionalQueryAttributes() {
         return optionalAttributes;
     }
 

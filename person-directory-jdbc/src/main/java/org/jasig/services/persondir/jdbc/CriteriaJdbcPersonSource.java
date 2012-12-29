@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
+import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.BinaryLogicCriteria;
 import org.jasig.services.persondir.criteria.CompareCriteria;
@@ -17,7 +18,6 @@ import org.jasig.services.persondir.criteria.CompareCriteria.CompareOperation;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.IllegalCriteriaException;
 import org.jasig.services.persondir.criteria.NotCriteria;
-import org.jasig.services.persondir.spi.AttributeQuery;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.ResultSetExtractor;

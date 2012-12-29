@@ -10,10 +10,10 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
-import org.jasig.services.persondir.spi.AttributeQuery;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;

@@ -2,6 +2,7 @@ package org.jasig.services.persondir.core.config;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import net.sf.ehcache.Ehcache;
 
@@ -36,6 +37,10 @@ final class PersonDirectoryConfigBuilder
     private final String primaryIdAttribute;
     private volatile String mergeCacheName;
     private volatile Ehcache mergeCache;
+    private volatile String executorServiceName;
+    private volatile ExecutorService executorService;
+    private volatile int defaultMaxResults = 0;
+    private volatile int defaultQueryTimeout = 0;
 
     PersonDirectoryConfigBuilder(String primaryIdAttribute) {
         super(PersonDirectoryBuilder.class);
@@ -60,10 +65,15 @@ final class PersonDirectoryConfigBuilder
         
         //Resolve merge cache
         if (this.mergeCache == null && this.mergeCacheName != null) {
-            this.mergeCache = this.getBeanFactory().getBean(this.mergeCacheName, Ehcache.class);
+            this.mergeCache = beanFactory.getBean(this.mergeCacheName, Ehcache.class);
         }
         else if (this.mergeCacheName == null && this.mergeCache != null) {
             this.mergeCacheName = this.mergeCache.getName();
+        }
+        
+        //Resolve executor service
+        if (this.executorService == null && this.executorServiceName != null) {
+            this.executorService = beanFactory.getBean(this.executorServiceName, ExecutorService.class);
         }
     }
 
@@ -95,6 +105,48 @@ final class PersonDirectoryConfigBuilder
         return this.getThis();
     }
     
+    
+    @Override
+    public PersonDirectoryBuilder setDefaultMaxResults(int defaultMaxResults) {
+        this.defaultMaxResults = defaultMaxResults;
+        return this.getThis();
+    }
+
+    @Override
+    public PersonDirectoryBuilder setDefaultQueryTimeout(int defaultQueryTimeout) {
+        this.defaultQueryTimeout = defaultQueryTimeout;
+        return this.getThis();
+    }
+    
+
+    @Override
+    public PersonDirectoryBuilder setExecutorServiceName(String executorServiceName) {
+        if (this.getBeanFactory() != null) {
+            throw new IllegalStateException("Cannot change the ExecutorService after config initialization");
+        }
+        
+        if (this.executorService != null) {
+            this.logger.warn("Overwriting executorService property of '" + this.executorService + "' on source 'TODO' with executorServiceName of: '" + executorServiceName);
+            this.executorService = null;
+        }
+        this.executorServiceName = executorServiceName;
+        return this.getThis();
+    }
+
+    @Override
+    public PersonDirectoryBuilder setExecutorService(ExecutorService executorService) {
+        if (this.getBeanFactory() != null) {
+            throw new IllegalStateException("Cannot change the ExecutorService after config initialization");
+        }
+        
+        if (this.executorServiceName != null) {
+            this.logger.warn("Overwriting executorServiceName property of '" + this.executorServiceName + "' on source 'TODO' with executorService of: '" + executorService);
+            this.executorServiceName = null;
+        }
+        this.executorService = executorService;
+        return this.getThis();
+    }
+
     @Override
     public SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source) {
         final SimpleAttributeSourceConfigBuilder sourceBuilder = new SimpleAttributeSourceConfigBuilder(source);
@@ -129,6 +181,16 @@ final class PersonDirectoryConfigBuilder
         }
         return this.sourceConfigs;
     }
+    
+    @Override
+    public int getDefaultMaxResults() {
+        return this.defaultMaxResults;
+    }
+
+    @Override
+    public int getDefaultQueryTimeout() {
+        return this.defaultQueryTimeout;
+    }
 
     @Override
     public String getPrimaryIdAttribute() {
@@ -136,12 +198,12 @@ final class PersonDirectoryConfigBuilder
     }
 
     @Override
-    public String getMergeCacheName() {
-        return this.mergeCacheName;
+    public Ehcache getMergeCache() {
+        return this.mergeCache;
     }
 
     @Override
-    public Ehcache getMergeCache() {
-        return this.mergeCache;
+    public ExecutorService getExecutorService() {
+        return this.executorService;
     }
 }

@@ -7,8 +7,8 @@ import java.util.Set;
 
 import javax.sql.DataSource;
 
+import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
-import org.jasig.services.persondir.spi.AttributeQuery;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcOperations;
