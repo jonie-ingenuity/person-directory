@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -19,14 +20,11 @@ import org.jasig.services.persondir.Person;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.PersonDirectory;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
-import org.jasig.services.persondir.core.config.CriteriaSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
-import org.jasig.services.persondir.core.config.SimpleSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.criteria.Criteria;
-import org.jasig.services.persondir.spi.gate.CriteriaSearchableAttributeSourceGate;
-import org.jasig.services.persondir.spi.gate.SimpleAttributeSourceGate;
-import org.jasig.services.persondir.spi.gate.SimpleSearchableAttributeSourceGate;
+import org.jasig.services.persondir.spi.BaseAttributeSource;
+import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -122,6 +120,19 @@ public class PersonDirectoryImpl implements PersonDirectory {
     @Override
     public List<Person> simpleSearchForPeople(AttributeQuery<Map<String, Object>> query) {
         //TODO verify no null values
+
+        //Ack these generics are getting REALLY gross :(
+        final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource, ? extends AttributeSourceGate>, ? extends AttributeSourceGate>> sortedWorkers
+            = new TreeSet<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource, ? extends AttributeSourceGate>, ? extends AttributeSourceGate>>(AttributeQueryWorkerComparator.INSTANCE);
+        
+        //TODO this gate approach is BAD, one gate impl needs to be able to filter every type of query 
+        
+        for (final AttributeSourceConfig<?, ?> sourceConfig : this.sortedSources) {
+            if (sourceConfig instanceof SimpleAttributeSourceConfig) {
+                final SimpleAttributeQueryWorker worker = new SimpleAttributeQueryWorker(this.config, (SimpleAttributeSourceConfig)sourceConfig);
+                sortedWorkers.add(worker);
+            }
+        }
         
         //Map of results using the same ordering as the sources to make later merges easier
         final Map<AttributeSourceConfig<?, ?>, Future<List<PersonAttributes>>> resultFutures = new TreeMap<AttributeSourceConfig<?, ?>, Future<List<PersonAttributes>>>(AttributeSourceConfigComparator.INSTANCE);
@@ -246,46 +257,6 @@ public class PersonDirectoryImpl implements PersonDirectory {
         
         
         return null;
-    }
-    
-    protected boolean canQuerySource(AttributeSourceConfig<?, ?> sourceConfig, AttributeQuery<?> attributeQuery) {
-        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
-        final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
-        
-        if (    //If there are required attributes the query map must contain all of them
-                (requiredQueryAttributes.isEmpty() || !queryAttributes.containsAll(requiredQueryAttributes))
-                &&
-                //If there are no required attributes the query map must contain at least one optional attribute
-                (!requiredQueryAttributes.isEmpty() || Collections.disjoint(queryAttributes, optionalQueryAttributes))) {
-            return false;
-        }
-        
-        if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
-            for (final CriteriaSearchableAttributeSourceGate gate : ((CriteriaSearchableAttributeSourceConfig)sourceConfig).getGates()) {
-                if (!gate.checkCriteriaSearch(query)) {
-                    return false;
-                }
-            }
-        }
-        else if (sourceConfig instanceof SimpleSearchableAttributeSourceConfig) {
-            for (final SimpleSearchableAttributeSourceGate gate : ((SimpleSearchableAttributeSourceConfig)sourceConfig).getGates()) {
-                if (!gate.checkSimpleSearch(query)) {
-                    return false;
-                }
-            }
-        }
-        else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
-            for (final SimpleAttributeSourceGate gate : ((SimpleAttributeSourceConfig)sourceConfig).getGates()) {
-                if (!gate.checkFind(query)) {
-                    return false;
-                }
-            }
-        }
-        else {
-            throw new IllegalStateException(sourceConfig.getClass() + " is not a supported AttributeSourceConfig implementation");
-        }
-        
-        return true;
     }
     
     @Override

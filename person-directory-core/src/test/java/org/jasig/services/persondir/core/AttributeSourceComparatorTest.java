@@ -33,7 +33,7 @@ public class AttributeSourceComparatorTest {
         when(ss1.getOrder()).thenReturn(-1);
         when(s1.getOrder()).thenReturn(-1);
         
-        final List<AttributeSourceConfig<? extends BaseAttributeSource>> configs = Arrays.asList(cs1, cs2, ss1, ss2, s1, s2);
+        final List<AttributeSourceConfig<? extends BaseAttributeSource, ?>> configs = Arrays.asList(cs1, cs2, ss1, ss2, s1, s2);
         Collections.shuffle(configs, new Random(0));
         
         Collections.sort(configs, AttributeSourceConfigComparator.INSTANCE);
@@ -52,7 +52,7 @@ public class AttributeSourceComparatorTest {
         when(ss1.getOrder()).thenReturn(1);
         when(s1.getOrder()).thenReturn(1);
         
-        final List<AttributeSourceConfig<? extends BaseAttributeSource>> configs = Arrays.asList(cs1, cs2, ss1, ss2, s1, s2);
+        final List<AttributeSourceConfig<? extends BaseAttributeSource, ?>> configs = Arrays.asList(cs1, cs2, ss1, ss2, s1, s2);
         Collections.shuffle(configs, new Random(0));
         
         Collections.sort(configs, AttributeSourceConfigComparator.INSTANCE);

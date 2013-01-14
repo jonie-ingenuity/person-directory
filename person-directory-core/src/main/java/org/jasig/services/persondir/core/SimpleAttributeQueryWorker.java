@@ -12,19 +12,23 @@ import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
+import org.jasig.services.persondir.spi.gate.SimpleAttributeSourceGate;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 
 class SimpleAttributeQueryWorker 
-        extends AbstractAttributeQueryWorker<Map<String, Object>, SimpleAttributeSource, SimpleAttributeSourceConfig> {
+        extends AbstractAttributeQueryWorker<
+            Map<String, Object>, 
+            SimpleAttributeSource, 
+            SimpleAttributeSourceConfig,
+            SimpleAttributeSourceGate> {
     
     public SimpleAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
-            SimpleAttributeSourceConfig sourceConfig,
-            AttributeQuery<Map<String, Object>> originalQuery) {
+            SimpleAttributeSourceConfig sourceConfig) {
 
-        super(personDirectoryConfig, sourceConfig, originalQuery);
+        super(personDirectoryConfig, sourceConfig);
     }
     
     @Override
@@ -49,6 +53,17 @@ class SimpleAttributeQueryWorker
             }
         });
     }
+    
+    @Override
+    protected Set<String> getQueryAttributeNames(Map<String, Object> query) {
+        return query.keySet();
+    }
+
+    @Override
+    protected boolean checkGate(SimpleAttributeSourceGate gate, AttributeQuery<Map<String, Object>> query) {
+        return gate.checkFind(query);
+    }
+
 
     private final class SimpleAttributeQueryCallable extends AttributeQueryCallable {
         private final AttributeQuery<Map<String, Object>> attributeQuery;

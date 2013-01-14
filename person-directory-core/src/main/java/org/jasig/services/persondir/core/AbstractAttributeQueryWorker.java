@@ -1,7 +1,9 @@
 package org.jasig.services.persondir.core;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -18,6 +20,7 @@ import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
+import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.springframework.util.Assert;
 
 import com.google.common.util.concurrent.Futures;
@@ -33,12 +36,14 @@ import com.google.common.util.concurrent.Futures;
 abstract class AbstractAttributeQueryWorker<
         Q, 
         S extends BaseAttributeSource, 
-        C extends AttributeSourceConfig<S, ?>> {
+        C extends AttributeSourceConfig<S, G>,
+        G extends AttributeSourceGate> {
     
     protected final PersonDirectoryConfig personDirectoryConfig;
     protected final C sourceConfig;
-    protected final AttributeQuery<Q> filteredQuery;
     protected final long timeout;
+    
+    private AttributeQuery<Q> filteredQuery;
     
     private Serializable cachedCacheKey;
     private Future<List<PersonAttributes>> futureResult;
@@ -54,19 +59,13 @@ abstract class AbstractAttributeQueryWorker<
      */
     public AbstractAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
-            C sourceConfig,
-            AttributeQuery<Q> originalQuery) {
+            C sourceConfig) {
         
         Assert.notNull(personDirectoryConfig, "personDirectoryConfig cannot be null");
         Assert.notNull(sourceConfig, "sourceConfig cannot be null");
-        Assert.notNull(originalQuery, "originalQuery cannot be null");
-
+        
         this.personDirectoryConfig = personDirectoryConfig;
         this.sourceConfig = sourceConfig;
-        
-        //Filter the original query into a query specifically for this attribute source
-        final Q query = filterQuery(originalQuery.getQuery());
-        this.filteredQuery = new AttributeQuery<Q>(query, originalQuery);
         
         //Calculate the query timeout
         final int queryTimeout = this.filteredQuery.getQueryTimeout();
@@ -79,12 +78,55 @@ abstract class AbstractAttributeQueryWorker<
     }
     
     /**
+     * Check if this worker can run the specified query. Verifies that the source's attribute
+     * requirements have been met and that all gate checks pass.
+     */
+    public final boolean canRun(AttributeQuery<Q> attributeQuery) {
+        final Set<String> queryAttributeNames = getQueryAttributeNames(attributeQuery.getQuery());
+        
+        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
+        final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
+        if (    //If there are required attributes the query map must contain all of them
+                (requiredQueryAttributes.isEmpty() || !queryAttributeNames.containsAll(requiredQueryAttributes))
+                &&
+                //If there are no required attributes the query map must contain at least one optional attribute
+                (!requiredQueryAttributes.isEmpty() || Collections.disjoint(queryAttributeNames, optionalQueryAttributes))) {
+            return false;
+        }
+        
+        for (final G gate : sourceConfig.getGates()) {
+            if (!checkGate(gate, attributeQuery)) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Set the query to execute
+     */
+    public final void setQuery(AttributeQuery<Q> originalQuery) {
+        Assert.notNull(originalQuery, "originalQuery cannot be null");
+        if (this.filteredQuery != null) {
+            throw new IllegalStateException("Cannot set query twice");
+        }
+
+        //Filter the original query into a query specifically for this attribute source
+        final Q query = filterQuery(originalQuery.getQuery());
+        this.filteredQuery = new AttributeQuery<Q>(query, originalQuery);
+    }
+    
+    /**
      * Submit to the specified {@link ExecutorService} to execute
      * 
      * @throws IllegalStateException if {@link #submit(ExecutorService)} has already been called
      */
     public final void submit(ExecutorService service) {
         Assert.notNull(service);
+        if (this.filteredQuery == null) {
+            throw new IllegalStateException("setQuery must be called before submit");
+        }
         if (this.futureResult != null) {
             throw new IllegalStateException("Cannot submit worker twice");
         }
@@ -234,6 +276,13 @@ abstract class AbstractAttributeQueryWorker<
     public final long getComplete() {
         return complete;
     }
+    
+    /**
+     * @return The underlying attribute source configuration for this worker
+     */
+    public C getSourceConfig() {
+        return sourceConfig;
+    }
 
     /**
      * Common exception handling code for getting the result from the future
@@ -297,6 +346,16 @@ abstract class AbstractAttributeQueryWorker<
         
         return resultElement.getObjectValue();
     }
+    
+    /**
+     * @return The set of attribute names defined in the query
+     */
+    protected abstract Set<String> getQueryAttributeNames(Q query);
+    
+    /**
+     * @return The return value of the specified gate when executed against the specified query
+     */
+    protected abstract boolean checkGate(G gate, AttributeQuery<Q> query);
     
     /**
      * Create the {@link Callable} that does the actual query work, only called if no

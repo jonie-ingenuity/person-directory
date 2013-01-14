@@ -11,19 +11,23 @@ import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
+import org.jasig.services.persondir.spi.gate.SimpleSearchableAttributeSourceGate;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 
 class SimpleSearchableAttributeQueryWorker 
-        extends AbstractAttributeQueryWorker<Map<String, Object>, SimpleSearchableAttributeSource, SimpleSearchableAttributeSourceConfig> {
+        extends AbstractAttributeQueryWorker<
+            Map<String, Object>, 
+            SimpleSearchableAttributeSource, 
+            SimpleSearchableAttributeSourceConfig,
+            SimpleSearchableAttributeSourceGate> {
     
     public SimpleSearchableAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
-            SimpleSearchableAttributeSourceConfig sourceConfig,
-            AttributeQuery<Map<String, Object>> originalQuery) {
+            SimpleSearchableAttributeSourceConfig sourceConfig) {
 
-        super(personDirectoryConfig, sourceConfig, originalQuery);
+        super(personDirectoryConfig, sourceConfig);
     }
     
     @Override
@@ -47,6 +51,16 @@ class SimpleSearchableAttributeQueryWorker
                 return requiredQueryAttributes.contains(input) || optionalQueryAttributes.contains(input);
             }
         });
+    }
+    
+    @Override
+    protected Set<String> getQueryAttributeNames(Map<String, Object> query) {
+        return query.keySet();
+    }
+
+    @Override
+    protected boolean checkGate(SimpleSearchableAttributeSourceGate gate, AttributeQuery<Map<String, Object>> query) {
+        return gate.checkSimpleSearch(query);
     }
 
     private final class SimpleSearchableAttributeQueryCallable extends AttributeQueryCallable {

@@ -2,6 +2,7 @@ package org.jasig.services.persondir.core;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Set;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
@@ -10,16 +11,20 @@ import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
+import org.jasig.services.persondir.spi.gate.CriteriaSearchableAttributeSourceGate;
 
 class CriteriaSearchableAttributeQueryWorker 
-        extends AbstractAttributeQueryWorker<Criteria, CriteriaSearchableAttributeSource, CriteriaSearchableAttributeSourceConfig> {
+        extends AbstractAttributeQueryWorker<
+            Criteria, 
+            CriteriaSearchableAttributeSource, 
+            CriteriaSearchableAttributeSourceConfig,
+            CriteriaSearchableAttributeSourceGate> {
     
     public CriteriaSearchableAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
-            CriteriaSearchableAttributeSourceConfig sourceConfig,
-            AttributeQuery<Criteria> originalQuery) {
+            CriteriaSearchableAttributeSourceConfig sourceConfig) {
         
-        super(personDirectoryConfig, sourceConfig, originalQuery);
+        super(personDirectoryConfig, sourceConfig);
     }
 
     @Override
@@ -36,6 +41,17 @@ class CriteriaSearchableAttributeQueryWorker
     protected Criteria filterQuery(Criteria q) {
         // TODO how the heck do we filter criteria queries
         return null;
+    }
+
+    @Override
+    protected Set<String> getQueryAttributeNames(Criteria query) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    protected boolean checkGate(CriteriaSearchableAttributeSourceGate gate, AttributeQuery<Criteria> query) {
+        return gate.checkCriteriaSearch(query);
     }
 
     private final class CriteriaSearchableAttributeQueryCallable extends AttributeQueryCallable {
