@@ -15,6 +15,16 @@ public final class AttributeQuery<Q> {
         this.maxResults = maxResults;
         this.queryTimeout = queryTimeout;
     }
+    
+    /**
+     * @param query The query to use
+     * @param settings The {@link AttributeQuery} to copy all other settings from
+     */
+    public AttributeQuery(Q query, AttributeQuery<Q> settings) {
+        this.query = query;
+        this.maxResults = settings.getMaxResults();
+        this.queryTimeout = settings.getQueryTimeout();
+    }
 
     /**
      * @return The query to execute
@@ -31,7 +41,7 @@ public final class AttributeQuery<Q> {
     }
     
     /**
-     * @return The maximum time in milliseconds to allow for query execution.
+     * @return The maximum time in milliseconds to allow for query execution, -1 means infinate timeout
      */
     public int getQueryTimeout() {
         return this.queryTimeout;

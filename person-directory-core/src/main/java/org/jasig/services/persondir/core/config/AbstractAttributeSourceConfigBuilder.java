@@ -10,7 +10,7 @@ import java.util.Set;
 import net.sf.ehcache.Ehcache;
 
 import org.jasig.services.persondir.spi.BaseAttributeSource;
-import org.jasig.services.persondir.spi.filter.AttributeSourceFilter;
+import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.util.Assert;
 
@@ -21,10 +21,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 
 abstract class AbstractAttributeSourceConfigBuilder<
-            T extends AttributeSourceBuilder<T>, 
-            S extends BaseAttributeSource> 
+            T extends AttributeSourceBuilder<T, G>, 
+            S extends BaseAttributeSource,
+            G extends AttributeSourceGate> 
         extends AbstractConfigBuilder<T> 
-        implements AttributeSourceBuilder<T>, AttributeSourceConfig<S> {
+        implements AttributeSourceBuilder<T, G>, AttributeSourceConfig<S, G> {
     
     private final S source;
     private volatile String resultCacheName;
@@ -38,7 +39,7 @@ abstract class AbstractAttributeSourceConfigBuilder<
     private volatile MergeBehavior mergeBehavior;
     private volatile int mergeOrder;
     private volatile boolean ignoreUnmappedAttributes = false;
-    private List<AttributeSourceFilter> filters = new ArrayList<AttributeSourceFilter>();
+    private List<G> gates = new ArrayList<G>();
     private Multimap<String, String> attributeMapping = HashMultimap.create();
     private Set<String> requiredAttributes = new HashSet<String>();
     private Set<String> optionalAttributes = new HashSet<String>();
@@ -80,22 +81,21 @@ abstract class AbstractAttributeSourceConfigBuilder<
         }
         
         //Make collections immutable as these can't easily be changed at runtime
-        this.filters = ImmutableList.copyOf(this.filters);
+        this.gates = ImmutableList.copyOf(this.gates);
         this.attributeMapping = ImmutableMultimap.copyOf(this.attributeMapping);
         this.requiredAttributes = ImmutableSet.copyOf(this.requiredAttributes);
         this.optionalAttributes = ImmutableSet.copyOf(this.optionalAttributes);
         this.availableAttributes = ImmutableSet.copyOf(this.availableAttributes);
     }
 
-
     @Override
-    public final T addFilter(AttributeSourceFilter... filter) {
-        for (final AttributeSourceFilter f : filter) {
-            filters.add(f);
+    public final T addGate(G... gate) {
+        for (final G f : gate) {
+            gates.add(f);
         }
         return this.getThis();
     }
-    
+
     @Override
     public final T setResultCacheName(String cacheName) {
         final BeanFactory beanFactory = this.getBeanFactory();
@@ -251,8 +251,8 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
     
     @Override
-    public final List<AttributeSourceFilter> getFilters() {
-        return filters;
+    public List<G> getGates() {
+        return gates;
     }
 
     @Override

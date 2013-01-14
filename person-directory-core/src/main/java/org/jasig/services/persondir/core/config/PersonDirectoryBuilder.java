@@ -8,6 +8,7 @@ import org.jasig.services.persondir.PersonDirectory;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
+import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 import org.springframework.beans.factory.BeanFactory;
 
 public interface PersonDirectoryBuilder {
@@ -30,4 +31,8 @@ public interface PersonDirectoryBuilder {
     CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source);
     
     PersonDirectory build(BeanFactory beanFactory);
+
+    PersonDirectoryBuilder setCacheKeyGenerator(CacheKeyGenerator cacheKeyGenerator);
+
+    PersonDirectoryBuilder setCacheKeyGeneratorName(String cacheKeyGeneratorName);
 }

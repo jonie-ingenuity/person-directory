@@ -4,7 +4,6 @@ import static org.mockito.Mockito.when;
 
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
-import org.jasig.services.persondir.spi.filter.AttributeSourceFilter;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -25,9 +24,9 @@ public class ConfigBuilderTest {
     @Mock private SimpleAttributeSource graduationSurveyStatusAttributeSource;
     @Mock private SimpleAttributeSource heritageCheckAttributeSource;
     
-    @Mock private AttributeSourceFilter postGraduateSurveyFilter;
-    @Mock private AttributeSourceFilter isGraduatingFilter;
-    @Mock private AttributeSourceFilter hasUddsFilter;
+//    @Mock private AttributeSourceFilter postGraduateSurveyFilter;
+//    @Mock private AttributeSourceFilter isGraduatingFilter;
+//    @Mock private AttributeSourceFilter hasUddsFilter;
     
     @Mock private BeanFactory beanFactory;
     
@@ -121,7 +120,7 @@ public class ConfigBuilderTest {
         
         configBuilder
             .addAttributeSource(seniorGraduationStatusAttributeSource)
-            .addFilter(postGraduateSurveyFilter)
+//            .addFilter(postGraduateSurveyFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.graduating_senior")
             .addRequiredAttribute("ID")
             .addRequiredAttribute("Term")
@@ -132,7 +131,7 @@ public class ConfigBuilderTest {
         
         configBuilder
             .addAttributeSource(mastersGraduationStatusAttributeSource)
-            .addFilter(postGraduateSurveyFilter)
+//            .addFilter(postGraduateSurveyFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.graduating_masters")
             .addRequiredAttribute("m.id")
             .addRequiredAttribute("m.term")
@@ -143,7 +142,7 @@ public class ConfigBuilderTest {
         
         configBuilder
             .addAttributeSource(graduationSurveyStatusAttributeSource)
-            .addFilter(postGraduateSurveyFilter, isGraduatingFilter)
+//            .addFilter(postGraduateSurveyFilter, isGraduatingFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.graduating_senior_survey")
             .addRequiredAttribute("pvi")
             .addAttributeMapping("pvi", "wiscedupvi")
@@ -152,7 +151,7 @@ public class ConfigBuilderTest {
         
         configBuilder
             .addAttributeSource(heritageCheckAttributeSource)
-            .addFilter(hasUddsFilter)
+//            .addFilter(hasUddsFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.heritage_check")
             .addRequiredAttribute("person_id")
             .addAttributeMapping("person_id", "wisceduhrpersonid")

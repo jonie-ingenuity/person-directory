@@ -36,7 +36,7 @@ public class AttributeSourceComparatorTest {
         final List<AttributeSourceConfig<? extends BaseAttributeSource>> configs = Arrays.asList(cs1, cs2, ss1, ss2, s1, s2);
         Collections.shuffle(configs, new Random(0));
         
-        Collections.sort(configs, AttributeSourceComparator.INSTANCE);
+        Collections.sort(configs, AttributeSourceConfigComparator.INSTANCE);
 
         assertEquals(cs1, configs.get(0));
         assertEquals(cs2, configs.get(1));
@@ -55,7 +55,7 @@ public class AttributeSourceComparatorTest {
         final List<AttributeSourceConfig<? extends BaseAttributeSource>> configs = Arrays.asList(cs1, cs2, ss1, ss2, s1, s2);
         Collections.shuffle(configs, new Random(0));
         
-        Collections.sort(configs, AttributeSourceComparator.INSTANCE);
+        Collections.sort(configs, AttributeSourceConfigComparator.INSTANCE);
 
         assertEquals(cs2, configs.get(0));
         assertEquals(cs1, configs.get(1));

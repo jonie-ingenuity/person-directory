@@ -8,14 +8,14 @@ import java.util.Set;
 import net.sf.ehcache.Ehcache;
 
 import org.jasig.services.persondir.spi.BaseAttributeSource;
-import org.jasig.services.persondir.spi.filter.AttributeSourceFilter;
+import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.springframework.core.Ordered;
 
-public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Ordered {
+public interface AttributeSourceConfig<S extends BaseAttributeSource, G extends AttributeSourceGate> extends Ordered {
 
     S getAttributeSource();
-
-    List<AttributeSourceFilter> getFilters();
+    
+    List<G> getGates();
 
     Ehcache getResultCache();
 
@@ -39,11 +39,6 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Or
 
     Set<String> getOptionalQueryAttributes();
     
-    /**
-     * @return Superset of {@link #getRequiredQueryAttributes()} and {@link #getOptionalQueryAttributes()}
-     */
-    Set<String> getQueryAttributes();
-
     Set<String> getAvailableAttributes();
 
 }

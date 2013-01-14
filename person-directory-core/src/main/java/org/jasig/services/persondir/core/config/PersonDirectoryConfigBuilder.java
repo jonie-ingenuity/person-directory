@@ -11,6 +11,7 @@ import org.jasig.services.persondir.core.PersonDirectoryImpl;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
+import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
@@ -31,14 +32,16 @@ final class PersonDirectoryConfigBuilder
     
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     
-    private Set<AbstractAttributeSourceConfigBuilder<?, ?>> sourceBuilders = new LinkedHashSet<AbstractAttributeSourceConfigBuilder<?, ?>>();
-    private Set<AttributeSourceConfig<?>> sourceConfigs;
+    private Set<AbstractAttributeSourceConfigBuilder<?, ?, ?>> sourceBuilders = new LinkedHashSet<AbstractAttributeSourceConfigBuilder<?, ?, ?>>();
+    private Set<AttributeSourceConfig<?, ?>> sourceConfigs;
     
     private final String primaryIdAttribute;
+    private String executorServiceName;
+    private ExecutorService executorService;
+    private String cacheKeyGeneratorName;
+    private CacheKeyGenerator cacheKeyGenerator;
     private volatile String mergeCacheName;
     private volatile Ehcache mergeCache;
-    private volatile String executorServiceName;
-    private volatile ExecutorService executorService;
     private volatile int defaultMaxResults = 0;
     private volatile int defaultQueryTimeout = 0;
 
@@ -55,8 +58,8 @@ final class PersonDirectoryConfigBuilder
         final BeanFactory beanFactory = this.getBeanFactory();
         
         //Initialize and copy all attribute sources
-        final Builder<AttributeSourceConfig<?>> sourceConfigsBuilder = ImmutableSet.builder();
-        for (final AbstractAttributeSourceConfigBuilder<?, ?> configBuilder : this.sourceBuilders) {
+        final Builder<AttributeSourceConfig<?, ?>> sourceConfigsBuilder = ImmutableSet.builder();
+        for (final AbstractAttributeSourceConfigBuilder<?, ?, ?> configBuilder : this.sourceBuilders) {
             configBuilder.resolveConfiguration(beanFactory);
             sourceConfigsBuilder.add(configBuilder);
         }
@@ -75,13 +78,18 @@ final class PersonDirectoryConfigBuilder
         if (this.executorService == null && this.executorServiceName != null) {
             this.executorService = beanFactory.getBean(this.executorServiceName, ExecutorService.class);
         }
+        
+        //Resolve cacheKeyGenerator
+        if (this.cacheKeyGenerator == null && this.cacheKeyGeneratorName != null) {
+            this.cacheKeyGenerator = beanFactory.getBean(this.cacheKeyGeneratorName, CacheKeyGenerator.class);
+        }
     }
 
     @Override
     public final PersonDirectoryBuilder setMergeCacheName(String cacheName) {
         final BeanFactory beanFactory = this.getBeanFactory();
         if (this.mergeCache != null && beanFactory == null) {
-            this.logger.warn("Overwriting mergeCache property of '" + this.mergeCache.getName() + "' on source 'TODO' with mergeCacheName of: '" + cacheName);
+            this.logger.warn("Overwriting mergeCache property of '" + this.mergeCache.getName() + "' with mergeCacheName of: '" + cacheName);
             this.mergeCache = null;
         }
         this.mergeCacheName = cacheName;
@@ -95,7 +103,7 @@ final class PersonDirectoryConfigBuilder
     public final PersonDirectoryBuilder setMergeCache(Ehcache cache) {
         final BeanFactory beanFactory = this.getBeanFactory();
         if (this.mergeCacheName != null && beanFactory == null) {
-            this.logger.warn("Overwriting mergeCacheName property of '" + this.mergeCacheName + "' on source 'TODO' with mergeCache of: '" + cache.getName());
+            this.logger.warn("Overwriting mergeCacheName property of '" + this.mergeCacheName + "' with mergeCache of: '" + cache.getName());
             this.mergeCacheName = null;
         }
         this.mergeCache = cache;
@@ -118,7 +126,6 @@ final class PersonDirectoryConfigBuilder
         return this.getThis();
     }
     
-
     @Override
     public PersonDirectoryBuilder setExecutorServiceName(String executorServiceName) {
         if (this.getBeanFactory() != null) {
@@ -126,7 +133,7 @@ final class PersonDirectoryConfigBuilder
         }
         
         if (this.executorService != null) {
-            this.logger.warn("Overwriting executorService property of '" + this.executorService + "' on source 'TODO' with executorServiceName of: '" + executorServiceName);
+            this.logger.warn("Overwriting executorService property of '" + this.executorService + "' with executorServiceName of: '" + executorServiceName);
             this.executorService = null;
         }
         this.executorServiceName = executorServiceName;
@@ -140,10 +147,38 @@ final class PersonDirectoryConfigBuilder
         }
         
         if (this.executorServiceName != null) {
-            this.logger.warn("Overwriting executorServiceName property of '" + this.executorServiceName + "' on source 'TODO' with executorService of: '" + executorService);
+            this.logger.warn("Overwriting executorServiceName property of '" + this.executorServiceName + "' with executorService of: '" + executorService);
             this.executorServiceName = null;
         }
         this.executorService = executorService;
+        return this.getThis();
+    }
+    
+    @Override
+    public PersonDirectoryBuilder setCacheKeyGeneratorName(String cacheKeyGeneratorName) {
+        if (this.getBeanFactory() != null) {
+            throw new IllegalStateException("Cannot change the CacheKeyGenerator after config initialization");
+        }
+        
+        if (this.cacheKeyGenerator != null) {
+            this.logger.warn("Overwriting cacheKeyGenerator property of '" + this.cacheKeyGenerator + "' with cacheKeyGeneratorName of: '" + cacheKeyGeneratorName);
+            this.cacheKeyGenerator = null;
+        }
+        this.cacheKeyGeneratorName = cacheKeyGeneratorName;
+        return this.getThis();
+    }
+
+    @Override
+    public PersonDirectoryBuilder setCacheKeyGenerator(CacheKeyGenerator cacheKeyGenerator) {
+        if (this.getBeanFactory() != null) {
+            throw new IllegalStateException("Cannot change the CacheKeyGenerator after config initialization");
+        }
+        
+        if (this.cacheKeyGeneratorName != null) {
+            this.logger.warn("Overwriting cacheKeyGeneratorName property of '" + this.cacheKeyGeneratorName + "' with cacheKeyGenerator of: '" + cacheKeyGenerator);
+            this.cacheKeyGeneratorName = null;
+        }
+        this.cacheKeyGenerator = cacheKeyGenerator;
         return this.getThis();
     }
 
@@ -175,7 +210,7 @@ final class PersonDirectoryConfigBuilder
     }
     
     @Override
-    public Set<AttributeSourceConfig<?>> getSourceConfigs() {
+    public Set<AttributeSourceConfig<?, ?>> getSourceConfigs() {
         if (this.sourceConfigs == null) {
             throw new IllegalStateException("resolveConfiguration(BeanFactory) must be called first.");
         }
@@ -205,5 +240,10 @@ final class PersonDirectoryConfigBuilder
     @Override
     public ExecutorService getExecutorService() {
         return this.executorService;
+    }
+
+    @Override
+    public CacheKeyGenerator getCacheKeyGenerator() {
+        return cacheKeyGenerator;
     }
 }

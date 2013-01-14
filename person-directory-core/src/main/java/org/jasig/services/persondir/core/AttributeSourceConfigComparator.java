@@ -8,12 +8,14 @@ import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.SimpleSearchableAttributeSourceConfig;
 import org.springframework.core.OrderComparator;
 
-class AttributeSourceComparator implements Comparator<AttributeSourceConfig<?>> {
-    public static final AttributeSourceComparator INSTANCE = new AttributeSourceComparator();
+class AttributeSourceConfigComparator implements Comparator<AttributeSourceConfig<?, ?>> {
+    public static final AttributeSourceConfigComparator INSTANCE = new AttributeSourceConfigComparator();
 
     @Override
-    public int compare(AttributeSourceConfig<?> o1, AttributeSourceConfig<?> o2) {
+    public int compare(AttributeSourceConfig<?, ?> o1, AttributeSourceConfig<?, ?> o2) {
+        @SuppressWarnings("rawtypes")
         final Class<? extends AttributeSourceConfig> c1 = o1.getClass();
+        @SuppressWarnings("rawtypes")
         final Class<? extends AttributeSourceConfig> c2 = o2.getClass();
         
         final boolean c1CriteriaSearch = CriteriaSearchableAttributeSourceConfig.class.isAssignableFrom(c1);
@@ -29,6 +31,7 @@ class AttributeSourceComparator implements Comparator<AttributeSourceConfig<?>> 
             return OrderComparator.INSTANCE.compare(o1, o2);
         }
         
+        //Order is criteria search -> simple search -> simple
         if (c1CriteriaSearch || (c1SimpleSearch && !c2CriteriaSearch) || (c1Simple && !c2CriteriaSearch && !c2SimpleSearch)) {
             return -1;
         }

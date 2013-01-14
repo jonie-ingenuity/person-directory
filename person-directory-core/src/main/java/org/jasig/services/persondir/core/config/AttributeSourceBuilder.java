@@ -2,7 +2,7 @@ package org.jasig.services.persondir.core.config;
 
 import net.sf.ehcache.Ehcache;
 
-import org.jasig.services.persondir.spi.filter.AttributeSourceFilter;
+import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 
 /**
  * Base class for configuration of an attribute source.
@@ -11,12 +11,9 @@ import org.jasig.services.persondir.spi.filter.AttributeSourceFilter;
  * @param <T> The concrete type of the superclass, used to allow builder pattern with an abstract class
  * @param <S> The attribute source type
  */
-public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T>> {
-    /**
-     * Adds a filter to be wrapped around the attribute source
-     */
-    T addFilter(AttributeSourceFilter... filter);
-
+public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T, G>, G extends AttributeSourceGate> {
+    T addGate(G... gate);
+    
     T setResultCacheName(String cacheName);
 
     T setResultCache(Ehcache cache);
