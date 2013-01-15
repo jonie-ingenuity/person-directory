@@ -9,9 +9,9 @@ import net.sf.ehcache.Ehcache;
 
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
-import org.springframework.core.Ordered;
 
-public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Ordered {
+public interface AttributeSourceConfig<S extends BaseAttributeSource> {
+    String getName();
 
     S getAttributeSource();
     
@@ -26,10 +26,6 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Or
     long getQueryTimeout();
 
     TimeoutBehavior getTimeoutBehavior();
-
-    MergeBehavior getMergeBehavior();
-
-    int getMergeOrder();
 
     boolean isIgnoreUnmappedAttributes();
 

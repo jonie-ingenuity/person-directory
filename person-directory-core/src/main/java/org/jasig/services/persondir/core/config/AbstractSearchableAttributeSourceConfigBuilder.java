@@ -10,8 +10,8 @@ abstract class AbstractSearchableAttributeSourceConfigBuilder<
     
     private int maxResults;
     
-    AbstractSearchableAttributeSourceConfigBuilder(Class<T> type, S source) {
-        super(type, source);
+    AbstractSearchableAttributeSourceConfigBuilder(Class<T> type, S source, String name) {
+        super(type, source, name);
     }
     
     @Override

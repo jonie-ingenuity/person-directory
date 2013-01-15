@@ -30,10 +30,6 @@ public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T>> {
 
     T setTimeoutBehavior(TimeoutBehavior timeoutBehavior);
 
-    T setMergeBehavior(MergeBehavior mergeBehavior);
-
-    T setMergeOrder(int mergeOrder);
-
     T setIgnoreUnmappedAttributes(boolean ignoreUnmappedAttributes);
 
     T addAttributeMapping(String sourceAttribute, String directoryAttribute);

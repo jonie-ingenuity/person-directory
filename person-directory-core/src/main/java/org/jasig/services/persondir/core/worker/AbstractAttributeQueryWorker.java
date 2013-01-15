@@ -3,9 +3,7 @@ package org.jasig.services.persondir.core.worker;
 import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import net.sf.ehcache.Ehcache;
@@ -43,10 +41,10 @@ public abstract class AbstractAttributeQueryWorker<
     protected final long timeout;
     protected final AttributeQuery<Q> filteredQuery;
     
-    private Serializable cachedCacheKey;
+    private volatile Serializable cachedCacheKey;
     private ListenableFuture<List<PersonAttributes>> futureResult;
-    private List<PersonAttributes> result;
-    private Throwable error;
+    private volatile List<PersonAttributes> result;
+    private volatile Throwable error;
     
     private long submitted = 0;
     private volatile long started = 0;
@@ -85,7 +83,7 @@ public abstract class AbstractAttributeQueryWorker<
      * 
      * @throws IllegalStateException if {@link #submit(ExecutorService)} has already been called
      */
-    public final void submit(ListeningExecutorService service, FutureCallback<List<PersonAttributes>> futureCallback) {
+    public final void submit(ListeningExecutorService service, final Runnable futureCallback) {
         Assert.notNull(service);
         if (this.futureResult != null) {
             throw new IllegalStateException("Cannot submit worker twice");
@@ -128,77 +126,29 @@ public abstract class AbstractAttributeQueryWorker<
         //Nothing in the caches, submit the worker
         final AttributeQueryCallable task = createQueryCallable(this.filteredQuery);
         this.futureResult = service.submit(task);
-        Futures.addCallback(this.futureResult, futureCallback);
+        
+        //Add on-completion callbacks
+        Futures.addCallback(this.futureResult, new FutureCallback<List<PersonAttributes>>() {
+            @Override
+            public void onSuccess(List<PersonAttributes> result) {
+                setResult(result);
+                futureCallback.run();
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+                setError(t);
+                futureCallback.run();
+            }
+        });
     }
     
-    /**
-     * Get the result of the attribute query, must be called after {@link #submit(ExecutorService)}
-     * 
-     * @throws InterruptedException if interrupted while waiting for the result
-     * @throws IllegalStateException if {@link #submit(ExecutorService)} has not been called yet
-     */
-    public final List<PersonAttributes> getResult(boolean wait) throws InterruptedException, TimeoutException {
-        if (this.futureResult == null) {
-            throw new IllegalStateException("submit must be called before getResult");
-        }
-        
-        //Use already processed result if it exists
-        if (this.result != null) {
-            return this.result;
-        }
-        //Use already processed, throwable if it exists
-        if (this.error != null) {
-            rethrowUnchecked(this.error);
-            //Return never actually executed but helps the compiler know that rethrowUnchecked always throws and this if block never completes
-            return null;
-        }
-        
-        try {
-            if (wait) {
-                //If a timeout is set calculate the wait time based on when the query was started, wait a minimum of 1ms
-                if (this.timeout > -1) {
-                    final long waitTime = Math.max(1, this.timeout - (System.currentTimeMillis() - this.started));
-                    this.result = this.futureResult.get(waitTime, TimeUnit.MILLISECONDS);
-                }
-                //If no timeout is set wait forever
-                else {
-                    this.result = this.futureResult.get();
-                }
-            }
-            else if (this.futureResult.isDone()) {
-                //No waiting and future is done so just get the result
-                this.result = this.futureResult.get();
-            }
-            else { 
-                //Not waiting and future isn't done, return null
-                return null;
-            }
-        }
-        catch (InterruptedException e) {
-            //ACK we were interrupted while waiting, cancel the future, interrupting it, and rethrow
-            this.futureResult.cancel(true);
-            throw e;
-        }
-        catch (ExecutionException e) {
-            //Attribute source threw an exception, cache it and rethrow
-            this.error = e.getCause();
-            
-            handleResultException();
-            //Return never actually executed but helps the compiler know that handleResultException always throws and this if block never completes
-            return null;
-        } 
-        catch (TimeoutException e) {
-            //Timed out waiting for the source to return, cache it and rethrow
-            this.error = e;
-            
-            handleResultException();
-            //Return never actually executed but helps the compiler know that handleResultException always throws and this if block never completes
-            return null;
-        }
+    private final void setResult(List<PersonAttributes> result) {
+        this.result = result;
         
         //Empty result, cache it as a miss
         if (result.isEmpty()) {
-            final Ehcache missCache = sourceConfig.getMissCache();
+            final Ehcache missCache = this.sourceConfig.getMissCache();
             if (missCache != null) {
                 final Serializable cacheKey = this.getCacheKey();
                 missCache.put(new Element(cacheKey, result));
@@ -206,15 +156,60 @@ public abstract class AbstractAttributeQueryWorker<
         }
         //Non-empty result, cacheit as a hit
         else {
-            final Ehcache resultCache = sourceConfig.getResultCache();
+            final Ehcache resultCache = this.sourceConfig.getResultCache();
             if (resultCache != null) {
-                final Serializable cacheKey = this.getCacheKey();
+                final Serializable cacheKey = getCacheKey();
                 resultCache.put(new Element(cacheKey, result));
             }
         }
+    }
+    
+    private final void setError(Throwable t) {
+        this.error = t;
         
-        //Return the result
-        return result;
+        final Ehcache errorCache = this.sourceConfig.getErrorCache();
+        if (errorCache != null) {
+            final Serializable cacheKey = this.getCacheKey();
+            errorCache.put(new Element(cacheKey, this.error));
+        }
+    }
+
+    /**
+     * Get the result of the attribute query, must be called after {@link #submit(ExecutorService)}
+     * 
+     * @throws InterruptedException if interrupted while waiting for the result
+     * @throws IllegalStateException if {@link #submit(ExecutorService)} has not been called yet
+     */
+    public final List<PersonAttributes> getResult() throws InterruptedException, TimeoutException {
+        if (this.futureResult == null) {
+            throw new IllegalStateException("submit must be called before getResult");
+        }
+        if (!this.futureResult.isDone()) {
+            throw new IllegalStateException("getResult must not be called until the future has completed");
+        }
+        
+        //Use already processed, throwable if it exists
+        if (this.error != null) {
+            rethrowUnchecked(this.error);
+            //Return never actually executed but helps the compiler know that rethrowUnchecked always throws and this if block never completes
+            return null;
+        }
+        
+        return this.result;
+    }
+
+    /**
+     * @return The number of milliseconds to wait for the result from this worker
+     */
+    public final long getCurrentWaitTime() {
+        return Math.max(1, this.timeout - (System.currentTimeMillis() - this.started));
+    }
+    
+    /**
+     * @return The filtered query used by the worker
+     */
+    public final AttributeQuery<Q> getFilteredQuery() {
+        return this.filteredQuery;
     }
     
     /**
@@ -238,24 +233,23 @@ public abstract class AbstractAttributeQueryWorker<
         return complete;
     }
     
+    public final boolean cancel(boolean mayInterruptIfRunning) {
+        return futureResult.cancel(mayInterruptIfRunning);
+    }
+
+    public final boolean isCancelled() {
+        return futureResult.isCancelled();
+    }
+
+    public final boolean isDone() {
+        return futureResult.isDone();
+    }
+    
     /**
      * @return The underlying attribute source configuration for this worker
      */
     public final C getSourceConfig() {
         return sourceConfig;
-    }
-
-    /**
-     * Common exception handling code for getting the result from the future
-     */
-    protected final void handleResultException() throws TimeoutException {
-        final Ehcache errorCache = sourceConfig.getErrorCache();
-        if (errorCache != null) {
-            final Serializable cacheKey = this.getCacheKey();
-            errorCache.put(new Element(cacheKey, this.error));
-        }
-        
-        rethrowUnchecked(this.error);
     }
     
     /**

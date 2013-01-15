@@ -182,15 +182,15 @@ final class PersonDirectoryConfigBuilder
     }
 
     @Override
-    public SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source) {
-        final SimpleAttributeSourceConfigBuilder sourceBuilder = new SimpleAttributeSourceConfigBuilder(source);
+    public SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source, String name) {
+        final SimpleAttributeSourceConfigBuilder sourceBuilder = new SimpleAttributeSourceConfigBuilder(source, name);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
     }
     
     @Override
-    public CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source) {
-        final CriteriaSearchableAttributeSourceConfigBuilder sourceBuilder = new CriteriaSearchableAttributeSourceConfigBuilder(source);
+    public CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source, String name) {
+        final CriteriaSearchableAttributeSourceConfigBuilder sourceBuilder = new CriteriaSearchableAttributeSourceConfigBuilder(source, name);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
     }

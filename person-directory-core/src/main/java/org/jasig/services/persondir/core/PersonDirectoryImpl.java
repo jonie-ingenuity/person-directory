@@ -2,19 +2,15 @@ package org.jasig.services.persondir.core;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
-
-import net.sf.ehcache.Ehcache;
-import net.sf.ehcache.Element;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.Person;
@@ -28,6 +24,7 @@ import org.jasig.services.persondir.core.worker.AbstractAttributeQueryWorker;
 import org.jasig.services.persondir.core.worker.CriteriaSearchableAttributeQueryWorker;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
+import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.util.criteria.CriteriaAttributeNamesHandler;
 import org.jasig.services.persondir.util.criteria.CriteriaWalker;
 import org.slf4j.Logger;
@@ -40,6 +37,29 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class PersonDirectoryImpl implements PersonDirectory {
+    
+    /**
+     * Callback on worker completion that places the worker on the completeWorkerQueue
+     */
+    private static final class WorkerCompleteCallback implements Runnable {
+        private final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker;
+        private final Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkerQueue;
+
+        private WorkerCompleteCallback(
+                CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker,
+                Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkerQueue) {
+
+            this.criteriaSearchableQueryWorker = criteriaSearchableQueryWorker;
+            this.completeWorkerQueue = completeWorkerQueue;
+        }
+        
+        @Override
+        public void run() {
+            completeWorkerQueue.add(criteriaSearchableQueryWorker);
+        }
+    }
+
+
     protected final Logger logger = LoggerFactory.getLogger(getClass()); 
     
     protected final PersonDirectoryConfig config;
@@ -100,116 +120,112 @@ public class PersonDirectoryImpl implements PersonDirectory {
          * onto a concurrent queue. The main thread can then simply wait on the concurrent queue for new results
          * to show up
          * 
+         * 
+         * TODO where to put attribute transformations
+         * TODO delete merge order/behavior
+         * 
          */
         final Criteria originalCriteria = attributeQuery.getQuery();
         
-        final Map<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ?, ?>> workers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?,?,?>>();
-        final Queue<AbstractAttributeQueryWorker<?, ?, ?>> resultQueue = new ConcurrentLinkedQueue<AbstractAttributeQueryWorker<?,?,?>>();
+        //Structures to track attribute query worker progress
+        final Map<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+            runningWorkers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
-        //First pass, runs the Criteria against any DAO that it matches against
-        for (final AttributeSourceConfig<?> sourceConfig : config.getSourceConfigs()) {
+        final Map<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+            completeWorkers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+        
+        final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+            completeWorkerQueue = new LinkedBlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+        
+        //First Pass: runs the Criteria against any DAO that it matches against
+        final Set<AttributeSourceConfig<?>> sourceConfigs = config.getSourceConfigs();
+        for (final AttributeSourceConfig<?> sourceConfig : sourceConfigs) {
             if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
                 final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
                 if (canRun(originalCriteria, criteriaSearchableSourceConfig)) {
                     final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery);
-                    criteriaSearchableQueryWorker.submit(attributeSourceExecutor);
+                    runningWorkers.put(sourceConfig, criteriaSearchableQueryWorker);
+                    
+                    final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
+                    criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
                 }
             }
         }
-
-        boolean newQueryRan;
+        
+        final Map<String, PersonAttributes> resultsMap = new LinkedHashMap<String, PersonAttributes>();
+        
+        //2..N Pass: uses each result as a 
+        boolean resultHaveChanged = false;
         do {
-            final Map<String, Object> queryMap = query.getCriteria();
-            final Set<String> queryAttributes = queryMap.keySet();
-
-            
-            newQueryRan = false;
-            //Run every source we are able to
-            for (final AttributeSourceConfig<?, ?> sourceConfig : this.sortedSources) {
-                if (resultFutures.containsKey(sourceConfig) || results.containsKey(sourceConfig)) {
-                    //Skip any source that has already been processed
-                    continue;
-                }
-                
-                //determine if the source can be run for this query based on the attributes
-                if (canQuerySource(sourceConfig, queryAttributes)) {
-                    newQueryRan = true;
-                    
-                    final Future<List<PersonAttributes>> futureResult = doAttributesQuery(sourceConfig, queryMap);
-                    resultFutures.put(sourceConfig, futureResult);
-                }
+            if (resultHaveChanged) {
+                //do pass 2..N queries on remaining sources
             }
             
-            //Check for results
-            final int queryTimeout = query.getQueryTimeout();
-            boolean retrievedResult = false;
-            for (final Iterator<Map.Entry<AttributeSourceConfig<?, ?>, Future<List<PersonAttributes>>>> resultFuturesEntryItr = resultFutures.entrySet().iterator(); resultFuturesEntryItr.hasNext();) {
-                final Map.Entry<AttributeSourceConfig<?, ?>, Future<List<PersonAttributes>>> resultFuturesEntry = resultFuturesEntryItr.next();
-                
-                final AttributeSourceConfig<?, ?> sourceConfig = resultFuturesEntry.getKey();
-                try {
-                    final List<PersonAttributes> result = getResult(resultFuturesEntry, queryTimeout, newQueryRan, retrievedResult);
-                    
-                    if (result != null) {
-                        //non-null result means something was retrieved so remove the future
-                        resultFuturesEntryItr.remove();
-                        
-                        //If there was actual result data set the retrievedResult flag so we know to try subsiquent queries
-                        if (!result.isEmpty() && !retrievedResult) {
-                            retrievedResult = true;
-                        }
-                        
-                        //Put the result data in the results map
-                        results.put(sourceConfig, result);
-                    }
-                } 
-                catch (InterruptedException e) {
-                    //ACK! We were interrupted, need to stop query execution ASAP and return
-                    
-                    //Mark this thread as interrupted
-                    Thread.currentThread().interrupt();
-                    
-                    //Cancel all running futures
-                    for (final Future<?> future : resultFutures.values()) {
-                        future.cancel(true);
-                    }
-                    
-                    //Return an empty result for the seach
-                    return Collections.emptyList();
-                } 
-                catch (ExecutionException e) {
-                    final Throwable cause = e.getCause();
-                    this.logger.warn("Failed to execute " + query + " against " + sourceConfig, cause);
-                    
-                    final Ehcache errorCache = sourceConfig.getErrorCache();
-                    if (errorCache != null) {
-                        //TODO generate cache key, copy CacheKey from uPortal?
-                        final Object cacheKey = null;
-                        
-                        errorCache.put(new Element(cacheKey, cause));
-                    }
-                } 
-                catch (TimeoutException e) {
-                    // TODO handling of hung PD query threads?
-                    e.printStackTrace();
-                }
-            } 
+            //Reset resultsHaveChanged flag
+            resultHaveChanged = false;
             
-        } while (
-                !resultFutures.isEmpty() || //There are still futures that need results gotten from them
-                (
-                    newQueryRan && //A new query was run
-                    sortedSources.size() > results.size() //And there are sources left to query
-                )  
-            );
+            //Calculate the maximum time to wait for a result based on the currently executing workers
+            long maxWaitTime = 0;
+            for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers.values()) {
+                maxWaitTime = Math.max(maxWaitTime, queryWorker.getCurrentWaitTime());
+            }
+            
+            //Wait for a result to appear in the completeWorkerQueue
+            AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker = null;
+            try {
+                completeWorker = completeWorkerQueue.poll(maxWaitTime, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                //Interrupted by something while waiting for a result, assume we need to abort blocking operations and just return
+                //mark the thread as interrupted and break out of the wait-for-results loop
+                Thread.currentThread().interrupt();
+                break;
+            }
+            
+            if (completeWorker == null) {
+                // uhoh everything in-progress took longer than it should have and we can't have any new results at this point
+                // Cancel all in-progress workers and break out of the loop
+                for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers.values()) {
+                    queryWorker.cancel(true);
+                    break;
+                }
+            }
+            else {
+                while (completeWorker != null) {
+                    //Move the worker from the running map into the complete map
+                    final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = completeWorker.getSourceConfig();
+                    runningWorkers.remove(sourceConfig);
+                    completeWorkers.put(sourceConfig, completeWorker);
+                    
+                    try {
+                        final List<PersonAttributes> results = completeWorker.getResult();
+                        addResults(resultsMap, results);
+                    }
+                    catch (Throwable t) {
+                        logger.warn("'" + sourceConfig.getName() + "' threw an exception while retrieving attributes and will be ignored for query: " + completeWorker.getFilteredQuery(), t);
+                    }
+                 
+                    //Check if there are any more completed workers without waiting
+                    completeWorker = completeWorkerQueue.poll();
+                }
+            }
+        } while (sourceConfigs.size() < completeWorkers.size() && resultHaveChanged);
         
-        //TODO merge results goes here
         
+        /* results processing
+         *  apply original critera to each result
+         *  convert each PersonAttributes to a Person
+         *  build into ImmutableList
+         * 
+         */
         
         return null;
     }
     
-    public boolean canRun(Criteria criteria, CriteriaSearchableAttributeSourceConfig sourceConfig) {
+    protected void addResults(Map<String, PersonAttributes> resultsMap, List<PersonAttributes> results) {
+        //TODO
+    }
+    
+    protected boolean canRun(Criteria criteria, CriteriaSearchableAttributeSourceConfig sourceConfig) {
         final CriteriaAttributeNamesHandler criteriaAttributeNamesHandler = new CriteriaAttributeNamesHandler();
         CriteriaWalker.walkCriteria(criteria, criteriaAttributeNamesHandler);
         
@@ -230,7 +246,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
         return true;
     }
     
-    public boolean canRun(Map<String, Object> attributes, SimpleAttributeSourceConfig sourceConfig) {
+    protected boolean canRun(Map<String, Object> attributes, SimpleAttributeSourceConfig sourceConfig) {
         final Set<String> queryAttributeNames = attributes.keySet();
         
         final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();

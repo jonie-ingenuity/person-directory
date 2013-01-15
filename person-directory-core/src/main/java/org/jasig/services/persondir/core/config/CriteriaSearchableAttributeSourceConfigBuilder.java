@@ -6,7 +6,7 @@ final class CriteriaSearchableAttributeSourceConfigBuilder
     extends AbstractSearchableAttributeSourceConfigBuilder<CriteriaSearchableAttributeSourceBuilder, CriteriaSearchableAttributeSource>
     implements CriteriaSearchableAttributeSourceBuilder, CriteriaSearchableAttributeSourceConfig {
     
-    CriteriaSearchableAttributeSourceConfigBuilder(CriteriaSearchableAttributeSource source) {
-        super(CriteriaSearchableAttributeSourceBuilder.class, source);
+    CriteriaSearchableAttributeSourceConfigBuilder(CriteriaSearchableAttributeSource source, String name) {
+        super(CriteriaSearchableAttributeSourceBuilder.class, source, name);
     }
 }

@@ -53,7 +53,7 @@ public class ConfigBuilderTest {
                 "sn",
                 "eppn"));
         configBuilder
-            .addAttributeSource(requestAttributesDao)
+            .addAttributeSource(requestAttributesDao, "requestAttributesDao")
                 .addRequiredAttribute("remoteUser")
                 .addAttributeMapping("remoteUser", "username")
                 .addAttributeMapping("cn", "cn")
@@ -69,7 +69,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(uPortalAccountUserSource)
+            .addAttributeSource(uPortalAccountUserSource, "uPortalAccountUserSource")
                 .setMaxResults(100)
                 .addOptionalAttribute(
                         "username",
@@ -79,7 +79,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(uPortalJdbcUserSource)
+            .addAttributeSource(uPortalJdbcUserSource, "uPortalJdbcUserSource")
                 .setResultCacheName("org.jasig.services.persondir.USER_INFO.up_user")
                 .setMaxResults(100)
                 .addRequiredAttribute("username")
@@ -88,7 +88,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(ldapPersonAttributeDao)
+            .addAttributeSource(ldapPersonAttributeDao, "ldapPersonAttributeDao")
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.ldap")
             .setMaxResults(100)
             .addOptionalAttribute(
@@ -119,7 +119,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(seniorGraduationStatusAttributeSource)
+            .addAttributeSource(seniorGraduationStatusAttributeSource, "seniorGraduationStatusAttributeSource")
 //            .addFilter(postGraduateSurveyFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.graduating_senior")
             .addRequiredAttribute("ID")
@@ -130,7 +130,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(mastersGraduationStatusAttributeSource)
+            .addAttributeSource(mastersGraduationStatusAttributeSource, "mastersGraduationStatusAttributeSource")
 //            .addFilter(postGraduateSurveyFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.graduating_masters")
             .addRequiredAttribute("m.id")
@@ -141,7 +141,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(graduationSurveyStatusAttributeSource)
+            .addAttributeSource(graduationSurveyStatusAttributeSource, "graduationSurveyStatusAttributeSource")
 //            .addFilter(postGraduateSurveyFilter, isGraduatingFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.graduating_senior_survey")
             .addRequiredAttribute("pvi")
@@ -150,7 +150,7 @@ public class ConfigBuilderTest {
         
         
         configBuilder
-            .addAttributeSource(heritageCheckAttributeSource)
+            .addAttributeSource(heritageCheckAttributeSource, "heritageCheckAttributeSource")
 //            .addFilter(hasUddsFilter)
             .setResultCacheName("org.jasig.services.persondir.USER_INFO.heritage_check")
             .addRequiredAttribute("person_id")

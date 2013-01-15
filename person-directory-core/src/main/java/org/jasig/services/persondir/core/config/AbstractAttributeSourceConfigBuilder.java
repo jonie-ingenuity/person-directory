@@ -27,6 +27,7 @@ abstract class AbstractAttributeSourceConfigBuilder<
         implements AttributeSourceBuilder<T>, AttributeSourceConfig<S> {
     
     private final S source;
+    private final String name;
     private volatile String resultCacheName;
     private volatile Ehcache resultCache;
     private volatile String missCacheName;
@@ -35,8 +36,6 @@ abstract class AbstractAttributeSourceConfigBuilder<
     private volatile Ehcache errorCache;
     private volatile long queryTimeout = -1;
     private volatile TimeoutBehavior timeoutBehavior;
-    private volatile MergeBehavior mergeBehavior;
-    private volatile int mergeOrder;
     private volatile boolean ignoreUnmappedAttributes = false;
     private List<AttributeSourceGate> gates = new ArrayList<AttributeSourceGate>();
     private Multimap<String, String> attributeMapping = HashMultimap.create();
@@ -44,11 +43,13 @@ abstract class AbstractAttributeSourceConfigBuilder<
     private Set<String> optionalAttributes = new HashSet<String>();
     private Set<String> availableAttributes = new HashSet<String>();
     
-    AbstractAttributeSourceConfigBuilder(Class<T> type, S source) {
+    AbstractAttributeSourceConfigBuilder(Class<T> type, S source, String name) {
         super(type);
         Assert.notNull(source, "source cannot be null");
+        Assert.notNull(name, "name cannot be null");
         
         this.source = source;
+        this.name = name;
     }
     
     @Override
@@ -192,18 +193,6 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
 
     @Override
-    public final T setMergeBehavior(MergeBehavior mergeBehavior) {
-        this.mergeBehavior = mergeBehavior;
-        return this.getThis();
-    }
-
-    @Override
-    public final T setMergeOrder(int mergeOrder) {
-        this.mergeOrder = mergeOrder;
-        return this.getThis();
-    }
-    
-    @Override
     public final T setIgnoreUnmappedAttributes(boolean ignoreUnmappedAttributes) {
         this.ignoreUnmappedAttributes = ignoreUnmappedAttributes;
         return this.getThis();
@@ -240,10 +229,10 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
     
     @Override
-    public final int getOrder() {
-        return this.mergeOrder;
+    public String getName() {
+        return this.name;
     }
-
+    
     @Override
     public final S getAttributeSource() {
         return this.source;
@@ -279,16 +268,6 @@ abstract class AbstractAttributeSourceConfigBuilder<
         return timeoutBehavior;
     }
 
-    @Override
-    public final MergeBehavior getMergeBehavior() {
-        return mergeBehavior;
-    }
-
-    @Override
-    public final int getMergeOrder() {
-        return mergeOrder;
-    }
-    
     @Override
     public final boolean isIgnoreUnmappedAttributes() {
         return ignoreUnmappedAttributes;

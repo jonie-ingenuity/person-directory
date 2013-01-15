@@ -6,7 +6,7 @@ final class SimpleAttributeSourceConfigBuilder
         extends AbstractAttributeSourceConfigBuilder<SimpleAttributeSourceBuilder, SimpleAttributeSource>
         implements SimpleAttributeSourceBuilder, SimpleAttributeSourceConfig {
     
-    SimpleAttributeSourceConfigBuilder(SimpleAttributeSource source) {
-        super(SimpleAttributeSourceBuilder.class, source);
+    SimpleAttributeSourceConfigBuilder(SimpleAttributeSource source, String name) {
+        super(SimpleAttributeSourceBuilder.class, source, name);
     }
 }

@@ -23,9 +23,9 @@ public interface PersonDirectoryBuilder {
 
     PersonDirectoryBuilder setDefaultQueryTimeout(int defaultQueryTimeout);
     
-    SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source);
+    SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source, String name);
     
-    CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source);
+    CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source, String name);
     
     PersonDirectory build(BeanFactory beanFactory);
 
