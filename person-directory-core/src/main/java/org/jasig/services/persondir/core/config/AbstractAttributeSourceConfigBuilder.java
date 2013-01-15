@@ -21,11 +21,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 
 abstract class AbstractAttributeSourceConfigBuilder<
-            T extends AttributeSourceBuilder<T, G>, 
-            S extends BaseAttributeSource,
-            G extends AttributeSourceGate> 
+            T extends AttributeSourceBuilder<T>, 
+            S extends BaseAttributeSource> 
         extends AbstractConfigBuilder<T> 
-        implements AttributeSourceBuilder<T, G>, AttributeSourceConfig<S, G> {
+        implements AttributeSourceBuilder<T>, AttributeSourceConfig<S> {
     
     private final S source;
     private volatile String resultCacheName;
@@ -39,7 +38,7 @@ abstract class AbstractAttributeSourceConfigBuilder<
     private volatile MergeBehavior mergeBehavior;
     private volatile int mergeOrder;
     private volatile boolean ignoreUnmappedAttributes = false;
-    private List<G> gates = new ArrayList<G>();
+    private List<AttributeSourceGate> gates = new ArrayList<AttributeSourceGate>();
     private Multimap<String, String> attributeMapping = HashMultimap.create();
     private Set<String> requiredAttributes = new HashSet<String>();
     private Set<String> optionalAttributes = new HashSet<String>();
@@ -89,8 +88,8 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
 
     @Override
-    public final T addGate(G... gate) {
-        for (final G f : gate) {
+    public final T addGate(AttributeSourceGate... gate) {
+        for (final AttributeSourceGate f : gate) {
             gates.add(f);
         }
         return this.getThis();
@@ -251,7 +250,7 @@ abstract class AbstractAttributeSourceConfigBuilder<
     }
     
     @Override
-    public List<G> getGates() {
+    public List<AttributeSourceGate> getGates() {
         return gates;
     }
 

@@ -22,6 +22,7 @@
   <modules>
     <module>person-directory-api</module>
     <module>person-directory-spi</module>
+    <module>person-directory-util</module>
     <module>person-directory-core</module>
     <module>person-directory-jdbc</module>
   </modules>

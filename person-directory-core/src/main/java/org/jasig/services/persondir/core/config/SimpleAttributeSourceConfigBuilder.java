@@ -1,10 +1,9 @@
 package org.jasig.services.persondir.core.config;
 
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
-import org.jasig.services.persondir.spi.gate.SimpleAttributeSourceGate;
 
 final class SimpleAttributeSourceConfigBuilder
-        extends AbstractAttributeSourceConfigBuilder<SimpleAttributeSourceBuilder, SimpleAttributeSource, SimpleAttributeSourceGate>
+        extends AbstractAttributeSourceConfigBuilder<SimpleAttributeSourceBuilder, SimpleAttributeSource>
         implements SimpleAttributeSourceBuilder, SimpleAttributeSourceConfig {
     
     SimpleAttributeSourceConfigBuilder(SimpleAttributeSource source) {

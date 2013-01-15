@@ -10,7 +10,6 @@ import org.jasig.services.persondir.PersonDirectory;
 import org.jasig.services.persondir.core.PersonDirectoryImpl;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
-import org.jasig.services.persondir.spi.SimpleSearchableAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +31,8 @@ final class PersonDirectoryConfigBuilder
     
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     
-    private Set<AbstractAttributeSourceConfigBuilder<?, ?, ?>> sourceBuilders = new LinkedHashSet<AbstractAttributeSourceConfigBuilder<?, ?, ?>>();
-    private Set<AttributeSourceConfig<?, ?>> sourceConfigs;
+    private Set<AbstractAttributeSourceConfigBuilder<?, ?>> sourceBuilders = new LinkedHashSet<AbstractAttributeSourceConfigBuilder<?, ?>>();
+    private Set<AttributeSourceConfig<?>> sourceConfigs;
     
     private final String primaryIdAttribute;
     private String executorServiceName;
@@ -58,8 +57,8 @@ final class PersonDirectoryConfigBuilder
         final BeanFactory beanFactory = this.getBeanFactory();
         
         //Initialize and copy all attribute sources
-        final Builder<AttributeSourceConfig<?, ?>> sourceConfigsBuilder = ImmutableSet.builder();
-        for (final AbstractAttributeSourceConfigBuilder<?, ?, ?> configBuilder : this.sourceBuilders) {
+        final Builder<AttributeSourceConfig<?>> sourceConfigsBuilder = ImmutableSet.builder();
+        for (final AbstractAttributeSourceConfigBuilder<?, ?> configBuilder : this.sourceBuilders) {
             configBuilder.resolveConfiguration(beanFactory);
             sourceConfigsBuilder.add(configBuilder);
         }
@@ -190,13 +189,6 @@ final class PersonDirectoryConfigBuilder
     }
     
     @Override
-    public SimpleSearchableAttributeSourceBuilder addAttributeSource(SimpleSearchableAttributeSource source) {
-        final SimpleSearchableAttributeSourceConfigBuilder sourceBuilder = new SimpleSearchableAttributeSourceConfigBuilder(source);
-        sourceBuilders.add(sourceBuilder);
-        return sourceBuilder;
-    }
-    
-    @Override
     public CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source) {
         final CriteriaSearchableAttributeSourceConfigBuilder sourceBuilder = new CriteriaSearchableAttributeSourceConfigBuilder(source);
         sourceBuilders.add(sourceBuilder);
@@ -210,7 +202,7 @@ final class PersonDirectoryConfigBuilder
     }
     
     @Override
-    public Set<AttributeSourceConfig<?, ?>> getSourceConfigs() {
+    public Set<AttributeSourceConfig<?>> getSourceConfigs() {
         if (this.sourceConfigs == null) {
             throw new IllegalStateException("resolveConfiguration(BeanFactory) must be called first.");
         }

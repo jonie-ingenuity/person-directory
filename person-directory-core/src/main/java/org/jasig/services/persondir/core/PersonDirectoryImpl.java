@@ -1,12 +1,13 @@
 package org.jasig.services.persondir.core;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -20,65 +21,32 @@ import org.jasig.services.persondir.Person;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.PersonDirectory;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
+import org.jasig.services.persondir.core.config.CriteriaSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
+import org.jasig.services.persondir.core.worker.AbstractAttributeQueryWorker;
+import org.jasig.services.persondir.core.worker.CriteriaSearchableAttributeQueryWorker;
 import org.jasig.services.persondir.criteria.Criteria;
-import org.jasig.services.persondir.spi.BaseAttributeSource;
-import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
+import org.jasig.services.persondir.criteria.CriteriaBuilder;
+import org.jasig.services.persondir.util.criteria.CriteriaAttributeNamesHandler;
+import org.jasig.services.persondir.util.criteria.CriteriaWalker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
-import com.google.common.collect.Ordering;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
 public class PersonDirectoryImpl implements PersonDirectory {
     protected final Logger logger = LoggerFactory.getLogger(getClass()); 
     
     protected final PersonDirectoryConfig config;
-    private final ExecutorService attributeSourceExecutor;
-    private final List<AttributeSourceConfig<?, ?>> sortedSources;
-//    private final List<CriteriaSearchableAttributeSourceConfig> criteriaSearchableSources;
-//    private final List<SimpleSearchableAttributeSourceConfig> simpleSearchableSources;
-//    private final List<SimpleAttributeSourceConfig> simpleSources;
-    
+    private final ListeningExecutorService attributeSourceExecutor;
+
     public PersonDirectoryImpl(PersonDirectoryConfig config) {
         this.config = config;
-        
-        final Set<AttributeSourceConfig<?, ?>> sourceConfigs = config.getSourceConfigs();
-        
-        //Sort the sources by type and order
-        this.sortedSources = Ordering.from(AttributeSourceConfigComparator.INSTANCE).immutableSortedCopy(sourceConfigs);
-        
-//        final List<CriteriaSearchableAttributeSourceConfig> criteriaSearchableSourcesBuilder = new ArrayList<CriteriaSearchableAttributeSourceConfig>();
-//        final List<SimpleSearchableAttributeSourceConfig> simpleSearchableSourcesBuilder = new ArrayList<SimpleSearchableAttributeSourceConfig>();
-//        final List<SimpleAttributeSourceConfig> simpleSourcesBuilder = new ArrayList<SimpleAttributeSourceConfig>();
-//
-//        for (final AttributeSourceConfig<?> sourceConfig : this.config.getSourceConfigs()) {
-//            //TODO register each attribute source config with jmx
-//            
-//            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
-//                criteriaSearchableSourcesBuilder.add((CriteriaSearchableAttributeSourceConfig)sourceConfig);
-//            }
-//            else if (sourceConfig instanceof SimpleSearchableAttributeSourceConfig) {
-//                simpleSearchableSourcesBuilder.add((SimpleSearchableAttributeSourceConfig)sourceConfig);
-//            }
-//            else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
-//                simpleSourcesBuilder.add((SimpleAttributeSourceConfig)sourceConfig);
-//            }
-//            else {
-//                //TODO better exception
-//                throw new IllegalArgumentException("AttributeSourceConfig " + sourceConfig.getClass() + " does not implement a supported config interface.");
-//            }
-//        }
-//        
-//        //Create immutable copies sorted by their Order
-//        this.criteriaSearchableSources = Ordering.from(OrderComparator.INSTANCE).immutableSortedCopy(criteriaSearchableSourcesBuilder);
-//        this.simpleSearchableSources = Ordering.from(OrderComparator.INSTANCE).immutableSortedCopy(simpleSearchableSourcesBuilder);
-//        this.simpleSources = Ordering.from(OrderComparator.INSTANCE).immutableSortedCopy(simpleSourcesBuilder);
         
         //Setup executor service
         final ExecutorService executorService = config.getExecutorService();
@@ -87,21 +55,16 @@ public class PersonDirectoryImpl implements PersonDirectory {
             this.attributeSourceExecutor = MoreExecutors.sameThreadExecutor();
         }
         else {
-            this.attributeSourceExecutor = executorService;
+            this.attributeSourceExecutor = MoreExecutors.listeningDecorator(executorService);
         }
     }
 
     @Override
     public Person findPerson(String primaryId) {
-        return this.findPerson(createDefaultQuery(primaryId));
-    }
-    @Override
-    public Person findPerson(AttributeQuery<String> query) {
-        final String primaryId = query.getQuery();
-        final Map<String, Object> attributes = ImmutableMap.<String, Object>of(config.getPrimaryIdAttribute(), primaryId);
+        final Criteria criteria = CriteriaBuilder.eq(this.config.getPrimaryIdAttribute(), primaryId);
+        final AttributeQuery<Criteria> attributeQuery = this.createDefaultQuery(criteria);
         
-        final AttributeQuery<Map<String, Object>> subQuery = new AttributeQuery<Map<String, Object>>(attributes, query.getMaxResults(), query.getQueryTimeout());
-        final List<Person> results = this.simpleSearchForPeople(subQuery);
+        final List<Person> results = this.searchForPeople(attributeQuery);
         
         if (results.isEmpty()) {
             return null;
@@ -112,64 +75,51 @@ public class PersonDirectoryImpl implements PersonDirectory {
         
         return results.get(0);
     }
-
+    
     @Override
-    public List<Person> simpleSearchForPeople(Map<String, Object> attributes) {
-        return simpleSearchForPeople(createDefaultQuery(attributes));
+    public List<Person> searchForPeople(Criteria query) {
+        return searchForPeople(createDefaultQuery(query));
     }
     @Override
-    public List<Person> simpleSearchForPeople(AttributeQuery<Map<String, Object>> query) {
-        //TODO verify no null values
-
-        //Ack these generics are getting REALLY gross :(
-        final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource, ? extends AttributeSourceGate>, ? extends AttributeSourceGate>> sortedWorkers
-            = new TreeSet<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource, ? extends AttributeSourceGate>, ? extends AttributeSourceGate>>(AttributeQueryWorkerComparator.INSTANCE);
-        
-        //TODO this gate approach is BAD, one gate impl needs to be able to filter every type of query 
-        
-        for (final AttributeSourceConfig<?, ?> sourceConfig : this.sortedSources) {
-            if (sourceConfig instanceof SimpleAttributeSourceConfig) {
-                final SimpleAttributeQueryWorker worker = new SimpleAttributeQueryWorker(this.config, (SimpleAttributeSourceConfig)sourceConfig);
-                sortedWorkers.add(worker);
-            }
-        }
-        
-        //Map of results using the same ordering as the sources to make later merges easier
-        final Map<AttributeSourceConfig<?, ?>, Future<List<PersonAttributes>>> resultFutures = new TreeMap<AttributeSourceConfig<?, ?>, Future<List<PersonAttributes>>>(AttributeSourceConfigComparator.INSTANCE);
-        final Map<AttributeSourceConfig<?, ?>, List<PersonAttributes>> results = new TreeMap<AttributeSourceConfig<?, ?>, List<PersonAttributes>>(AttributeSourceConfigComparator.INSTANCE);
-        
+    public List<Person> searchForPeople(AttributeQuery<Criteria> attributeQuery) {
         /*
          * see BaseAdditiveAttributeMerger.mergeResults for ideas on how to merge to result lists
          *      SPI is string/obj but result is string/list<obj> - how do I deal with this missmatch?
          *      
-         *      
-         * generate a query map
-         *      first pass just use the query
-         *      later passes use the query + merge in results so far
-         *          we run one query loop per result so far, not sure how this logic flows
-         * set noNewQueriesRun = true
-         * set noNewQueriesMatched = true
-         * iterate through sources
-         *  if source does not have an entry in sourceResults
-         *      if source can be run based on current query map
-         *          submit query to executor
-         *          place Future in sourceResults map
-         *          set noNewQueriesRun = false
-         *          set noNewQueriesMatched = false
-         * iterate through resultFutures
-         *  if results.size + resultFutures.size == sources.size || noNewQueriesRun
-         *      do future.get with "wait for timeout duration" flag
-         *      set noNewQueriesRun = false if a result is retrieved from waiting for the future
-         *  else
-         *      do future.get with no waiting
-         * if !resultFuture.isEmpty() || !noNewQueriesMatched || sources.size > results.size then repeat from start
-         * merge results into final result map
+         * pass 1 uses original Criteria against all DAOs that it can match against
+         *  extra attributes in the critera are filtered out for that dao
+         * pass 2..N treats each result in the result set as a big OR criteria
+         * after no more sources or no new result mods the final result list is filtered by applying the original Criteria
+         * 
+         * problems with this ... using OR for the subsequent queries would result in exponential growth
+         *  we are looking for additional data for a single user so the attributes in the sub-queries should use AND
+         *
+         * Do we need a Map dao? yes for single result sources that have no concept of "searching"
+         * 
+         * For work execution use a ListenableFuture with a MoreExecutors.sameThreadExecutor() to push the result
+         * onto a concurrent queue. The main thread can then simply wait on the concurrent queue for new results
+         * to show up
          * 
          */
+        final Criteria originalCriteria = attributeQuery.getQuery();
+        
+        final Map<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ?, ?>> workers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?,?,?>>();
+        final Queue<AbstractAttributeQueryWorker<?, ?, ?>> resultQueue = new ConcurrentLinkedQueue<AbstractAttributeQueryWorker<?,?,?>>();
+        
+        //First pass, runs the Criteria against any DAO that it matches against
+        for (final AttributeSourceConfig<?> sourceConfig : config.getSourceConfigs()) {
+            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
+                final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
+                if (canRun(originalCriteria, criteriaSearchableSourceConfig)) {
+                    final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery);
+                    criteriaSearchableQueryWorker.submit(attributeSourceExecutor);
+                }
+            }
+        }
 
         boolean newQueryRan;
         do {
-            final Map<String, Object> queryMap = query.getQuery();
+            final Map<String, Object> queryMap = query.getCriteria();
             final Set<String> queryAttributes = queryMap.keySet();
 
             
@@ -259,22 +209,51 @@ public class PersonDirectoryImpl implements PersonDirectory {
         return null;
     }
     
-    @Override
-    public List<Person> criteriaSearchForPeople(Criteria query) {
-        return criteriaSearchForPeople(createDefaultQuery(query));
+    public boolean canRun(Criteria criteria, CriteriaSearchableAttributeSourceConfig sourceConfig) {
+        final CriteriaAttributeNamesHandler criteriaAttributeNamesHandler = new CriteriaAttributeNamesHandler();
+        CriteriaWalker.walkCriteria(criteria, criteriaAttributeNamesHandler);
+        
+        final Set<String> queryAttributeNames = criteriaAttributeNamesHandler.getAttributeNames();
+        
+        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
+        final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
+        if (    //If there are required attributes the query map must contain all of them
+                (requiredQueryAttributes.isEmpty() || !queryAttributeNames.containsAll(requiredQueryAttributes))
+                &&
+                //If there are no required attributes the query map must contain at least one optional attribute
+                (!requiredQueryAttributes.isEmpty() || Collections.disjoint(queryAttributeNames, optionalQueryAttributes))) {
+            return false;
+        }
+        
+        //TODO gates
+        
+        return true;
     }
-    @Override
-    public List<Person> criteriaSearchForPeople(AttributeQuery<Criteria> query) {
-        // TODO Auto-generated method stub
-        return null;
+    
+    public boolean canRun(Map<String, Object> attributes, SimpleAttributeSourceConfig sourceConfig) {
+        final Set<String> queryAttributeNames = attributes.keySet();
+        
+        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
+        final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
+        if (    //If there are required attributes the query map must contain all of them
+                (requiredQueryAttributes.isEmpty() || !queryAttributeNames.containsAll(requiredQueryAttributes))
+                &&
+                //If there are no required attributes the query map must contain at least one optional attribute
+                (!requiredQueryAttributes.isEmpty() || Collections.disjoint(queryAttributeNames, optionalQueryAttributes))) {
+            return false;
+        }
+        
+        //TODO gate check
+        
+        return true;
     }
-
+    
     @Override
     public Set<String> getSearchableAttributeNames() {
         //TODO cache this for a short time?
         final Builder<String> attributeNamesBuilder = ImmutableSet.builder();
         
-        for (final AttributeSourceConfig<?, ?> sourceConfig : this.config.getSourceConfigs()) {
+        for (final AttributeSourceConfig<?> sourceConfig : this.config.getSourceConfigs()) {
             final Set<String> requiredAttributes = sourceConfig.getRequiredQueryAttributes();
             attributeNamesBuilder.addAll(requiredAttributes);
             
@@ -290,7 +269,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
         //TODO cache this for a short time?
         final Builder<String> attributeNamesBuilder = ImmutableSet.builder();
         
-        for (final AttributeSourceConfig<?, ?> sourceConfig : this.config.getSourceConfigs()) {
+        for (final AttributeSourceConfig<?> sourceConfig : this.config.getSourceConfigs()) {
             final Set<String> availableAttributes = sourceConfig.getAvailableAttributes();
             attributeNamesBuilder.addAll(availableAttributes);
         }
@@ -302,7 +281,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
     /**
      * Create an {@link AttributeQuery} using the default configuration, wrapping the specified query.
      */
-    protected <Q> AttributeQuery<Q> createDefaultQuery(Q query) {
-        return new AttributeQuery<Q>(query, config.getDefaultMaxResults(), config.getDefaultQueryTimeout());
+    protected AttributeQuery<Criteria> createDefaultQuery(Criteria criteria) {
+        return new AttributeQuery<Criteria>(criteria, config.getDefaultMaxResults(), config.getDefaultQueryTimeout());
     }
 }

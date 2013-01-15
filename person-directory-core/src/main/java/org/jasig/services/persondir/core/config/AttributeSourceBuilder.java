@@ -11,8 +11,8 @@ import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
  * @param <T> The concrete type of the superclass, used to allow builder pattern with an abstract class
  * @param <S> The attribute source type
  */
-public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T, G>, G extends AttributeSourceGate> {
-    T addGate(G... gate);
+public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T>> {
+    T addGate(AttributeSourceGate... gate);
     
     T setResultCacheName(String cacheName);
 

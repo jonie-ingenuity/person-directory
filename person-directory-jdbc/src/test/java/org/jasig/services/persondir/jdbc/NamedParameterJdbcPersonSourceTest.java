@@ -1,7 +1,6 @@
 package org.jasig.services.persondir.jdbc;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.when;
@@ -27,7 +26,6 @@ public class NamedParameterJdbcPersonSourceTest {
     @InjectMocks private NamedParameterJdbcPersonSource personSource;
     @Mock private PerQueryCustomizableJdbcOperations jdbcOperations;
     @Mock private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
-    @Mock private AttributeQuery<Map<String, Object>> query;
     
     @Test
     public void test() {
@@ -37,11 +35,10 @@ public class NamedParameterJdbcPersonSourceTest {
         personSource.setQueryTemplate(sql);
         
         when(jdbcOperations.doNamedWithSettings(any(Function.class), anyInt(), anyInt())).thenReturn(Collections.<PersonAttributes>emptyList());
-        when(query.getQuery()).thenReturn(searchAttributes);
+
+        final AttributeQuery<Map<String, Object>> query = new AttributeQuery<Map<String,Object>>(searchAttributes, 1, 1);
+        final PersonAttributes result = personSource.findPersonAttributes(query);
         
-        final List<PersonAttributes> result = personSource.searchForAttributes(query);
-        
-        assertNotNull(result);
-        assertEquals(Collections.emptyList(), result);
+        assertNull(result);
     }
 }

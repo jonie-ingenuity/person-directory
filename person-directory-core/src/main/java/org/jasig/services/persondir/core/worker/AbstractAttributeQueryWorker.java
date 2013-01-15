@@ -1,13 +1,10 @@
-package org.jasig.services.persondir.core;
+package org.jasig.services.persondir.core.worker;
 
 import java.io.Serializable;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -18,12 +15,15 @@ import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
+import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
-import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.springframework.util.Assert;
 
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 
 /**
  * Base query worker that encapsulates the lifecycle of executing an attribute query
@@ -33,20 +33,18 @@ import com.google.common.util.concurrent.Futures;
  * @param <S> The {@link BaseAttributeSource} type
  * @param <C> The {@link AttributeSourceConfig} type
  */
-abstract class AbstractAttributeQueryWorker<
-        Q, 
+public abstract class AbstractAttributeQueryWorker<
+        Q,
         S extends BaseAttributeSource, 
-        C extends AttributeSourceConfig<S, G>,
-        G extends AttributeSourceGate> {
+        C extends AttributeSourceConfig<S>> {
     
     protected final PersonDirectoryConfig personDirectoryConfig;
     protected final C sourceConfig;
     protected final long timeout;
-    
-    private AttributeQuery<Q> filteredQuery;
+    protected final AttributeQuery<Q> filteredQuery;
     
     private Serializable cachedCacheKey;
-    private Future<List<PersonAttributes>> futureResult;
+    private ListenableFuture<List<PersonAttributes>> futureResult;
     private List<PersonAttributes> result;
     private Throwable error;
     
@@ -59,13 +57,18 @@ abstract class AbstractAttributeQueryWorker<
      */
     public AbstractAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
-            C sourceConfig) {
+            C sourceConfig,
+            AttributeQuery<Criteria> attributeQuery) {
         
         Assert.notNull(personDirectoryConfig, "personDirectoryConfig cannot be null");
         Assert.notNull(sourceConfig, "sourceConfig cannot be null");
+        Assert.notNull(attributeQuery, "attributeQuery cannot be null");
         
         this.personDirectoryConfig = personDirectoryConfig;
         this.sourceConfig = sourceConfig;
+        
+        final Q query = filterQuery(attributeQuery.getQuery());
+        this.filteredQuery = new AttributeQuery<Q>(query, attributeQuery);
         
         //Calculate the query timeout
         final int queryTimeout = this.filteredQuery.getQueryTimeout();
@@ -78,55 +81,12 @@ abstract class AbstractAttributeQueryWorker<
     }
     
     /**
-     * Check if this worker can run the specified query. Verifies that the source's attribute
-     * requirements have been met and that all gate checks pass.
-     */
-    public final boolean canRun(AttributeQuery<Q> attributeQuery) {
-        final Set<String> queryAttributeNames = getQueryAttributeNames(attributeQuery.getQuery());
-        
-        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
-        final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
-        if (    //If there are required attributes the query map must contain all of them
-                (requiredQueryAttributes.isEmpty() || !queryAttributeNames.containsAll(requiredQueryAttributes))
-                &&
-                //If there are no required attributes the query map must contain at least one optional attribute
-                (!requiredQueryAttributes.isEmpty() || Collections.disjoint(queryAttributeNames, optionalQueryAttributes))) {
-            return false;
-        }
-        
-        for (final G gate : sourceConfig.getGates()) {
-            if (!checkGate(gate, attributeQuery)) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Set the query to execute
-     */
-    public final void setQuery(AttributeQuery<Q> originalQuery) {
-        Assert.notNull(originalQuery, "originalQuery cannot be null");
-        if (this.filteredQuery != null) {
-            throw new IllegalStateException("Cannot set query twice");
-        }
-
-        //Filter the original query into a query specifically for this attribute source
-        final Q query = filterQuery(originalQuery.getQuery());
-        this.filteredQuery = new AttributeQuery<Q>(query, originalQuery);
-    }
-    
-    /**
      * Submit to the specified {@link ExecutorService} to execute
      * 
      * @throws IllegalStateException if {@link #submit(ExecutorService)} has already been called
      */
-    public final void submit(ExecutorService service) {
+    public final void submit(ListeningExecutorService service, FutureCallback<List<PersonAttributes>> futureCallback) {
         Assert.notNull(service);
-        if (this.filteredQuery == null) {
-            throw new IllegalStateException("setQuery must be called before submit");
-        }
         if (this.futureResult != null) {
             throw new IllegalStateException("Cannot submit worker twice");
         }
@@ -166,8 +126,9 @@ abstract class AbstractAttributeQueryWorker<
         }
         
         //Nothing in the caches, submit the worker
-        final AttributeQueryCallable task = createQueryCallable(filteredQuery);
+        final AttributeQueryCallable task = createQueryCallable(this.filteredQuery);
         this.futureResult = service.submit(task);
+        Futures.addCallback(this.futureResult, futureCallback);
     }
     
     /**
@@ -280,7 +241,7 @@ abstract class AbstractAttributeQueryWorker<
     /**
      * @return The underlying attribute source configuration for this worker
      */
-    public C getSourceConfig() {
+    public final C getSourceConfig() {
         return sourceConfig;
     }
 
@@ -319,8 +280,7 @@ abstract class AbstractAttributeQueryWorker<
     protected final Serializable getCacheKey() {
         if (this.cachedCacheKey == null) {
             final CacheKeyGenerator cacheKeyGenerator = this.personDirectoryConfig.getCacheKeyGenerator();
-            final Q c = this.filteredQuery.getQuery();
-            this.cachedCacheKey = generateCacheKey(c, cacheKeyGenerator);
+            this.cachedCacheKey = generateCacheKey(this.filteredQuery, cacheKeyGenerator);
         }
         
         return this.cachedCacheKey;
@@ -348,16 +308,6 @@ abstract class AbstractAttributeQueryWorker<
     }
     
     /**
-     * @return The set of attribute names defined in the query
-     */
-    protected abstract Set<String> getQueryAttributeNames(Q query);
-    
-    /**
-     * @return The return value of the specified gate when executed against the specified query
-     */
-    protected abstract boolean checkGate(G gate, AttributeQuery<Q> query);
-    
-    /**
      * Create the {@link Callable} that does the actual query work, only called if no
      * cached result exists
      */
@@ -366,12 +316,12 @@ abstract class AbstractAttributeQueryWorker<
     /**
      * Generate the cache key for the query, only called if caches are configured
      */
-    protected abstract Serializable generateCacheKey(Q q, CacheKeyGenerator keyGenerator);
+    protected abstract Serializable generateCacheKey(AttributeQuery<Q> attributeQuery, CacheKeyGenerator keyGenerator);
     
     /**
      * Filter the query for this attribute source, called during construction
      */
-    protected abstract Q filterQuery(Q q);
+    protected abstract Q filterQuery(Criteria criteria);
 
     /**
      * Base {@link Callable} that does the query work, tracks start/stop time for the query

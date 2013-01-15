@@ -1,4 +1,4 @@
-package org.jasig.services.persondir.core;
+package org.jasig.services.persondir.util.attributes;
 
 import java.util.ArrayList;
 import java.util.Collection;

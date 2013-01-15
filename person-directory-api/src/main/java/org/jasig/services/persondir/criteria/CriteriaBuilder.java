@@ -1,5 +1,7 @@
 package org.jasig.services.persondir.criteria;
 
+import java.util.Collection;
+
 import org.jasig.services.persondir.criteria.BinaryLogicCriteria.LogicOperation;
 import org.jasig.services.persondir.criteria.CompareCriteria.CompareOperation;
 
@@ -7,12 +9,20 @@ public final class CriteriaBuilder {
     private CriteriaBuilder() {
     }
     
-    public static Criteria and(Criteria a, Criteria... b) {
-        return new BinaryLogicCriteria(LogicOperation.AND, a, b);
+    public static Criteria and(Criteria... c) {
+        return new BinaryLogicCriteria(LogicOperation.AND, c);
     }
     
-    public static Criteria or(Criteria a, Criteria... b) {
-        return new BinaryLogicCriteria(LogicOperation.OR, a, b);
+    public static Criteria and(Collection<Criteria> c) {
+        return new BinaryLogicCriteria(LogicOperation.AND, c);
+    }
+    
+    public static Criteria or(Criteria... c) {
+        return new BinaryLogicCriteria(LogicOperation.OR, c);
+    }
+    
+    public static Criteria or(Collection<Criteria> c) {
+        return new BinaryLogicCriteria(LogicOperation.OR, c);
     }
     
     public static Criteria not(Criteria c) {

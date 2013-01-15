@@ -54,36 +54,36 @@ public class ConfigBuilderTest {
                 "eppn"));
         configBuilder
             .addAttributeSource(requestAttributesDao)
-            .addRequiredAttribute("remoteUser")
-            .addAttributeMapping("remoteUser", "username")
-            .addAttributeMapping("cn", "cn")
-            .addAttributeMapping("cn", "displayName")
-            .addAttributeMapping("eduWisconsinHRSEmplID", "hrPersonID")
-            .addAttributeMapping("eduWisconsinHRSEmplID", "eduWisconsinHRSEmplID")
-            .addAttributeMapping("eppn", "eppn")
-            .addAttributeMapping("eppn", "username")
-            .addAttributeMapping("eduWisconsinSPVI", "spvi")
-            .addAttributeMapping("eduWisconsinTelephoneNumberExtension", "telephoneNumber")
-            .addAttributeMapping("initials", "middleName")
-            ;
+                .addRequiredAttribute("remoteUser")
+                .addAttributeMapping("remoteUser", "username")
+                .addAttributeMapping("cn", "cn")
+                .addAttributeMapping("cn", "displayName")
+                .addAttributeMapping("eduWisconsinHRSEmplID", "hrPersonID")
+                .addAttributeMapping("eduWisconsinHRSEmplID", "eduWisconsinHRSEmplID")
+                .addAttributeMapping("eppn", "eppn")
+                .addAttributeMapping("eppn", "username")
+                .addAttributeMapping("eduWisconsinSPVI", "spvi")
+                .addAttributeMapping("eduWisconsinTelephoneNumberExtension", "telephoneNumber")
+                .addAttributeMapping("initials", "middleName")
+                ;
         
         
         configBuilder
             .addAttributeSource(uPortalAccountUserSource)
-            .setMaxResults(100)
-            .addOptionalAttribute(
-                    "username",
-                    "givenName",
-                    "sn")
+                .setMaxResults(100)
+                .addOptionalAttribute(
+                        "username",
+                        "givenName",
+                        "sn")
             ;
         
         
         configBuilder
             .addAttributeSource(uPortalJdbcUserSource)
-            .setResultCacheName("org.jasig.services.persondir.USER_INFO.up_user")
-            .setMaxResults(100)
-            .addRequiredAttribute("username")
-            .addAttributeMapping("USER_NAME", "username")
+                .setResultCacheName("org.jasig.services.persondir.USER_INFO.up_user")
+                .setMaxResults(100)
+                .addRequiredAttribute("username")
+                .addAttributeMapping("USER_NAME", "username")
             ;
         
         

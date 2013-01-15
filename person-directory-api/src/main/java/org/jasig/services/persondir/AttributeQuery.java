@@ -20,7 +20,7 @@ public final class AttributeQuery<Q> {
      * @param query The query to use
      * @param settings The {@link AttributeQuery} to copy all other settings from
      */
-    public AttributeQuery(Q query, AttributeQuery<Q> settings) {
+    public AttributeQuery(Q query, AttributeQuery<?> settings) {
         this.query = query;
         this.maxResults = settings.getMaxResults();
         this.queryTimeout = settings.getQueryTimeout();

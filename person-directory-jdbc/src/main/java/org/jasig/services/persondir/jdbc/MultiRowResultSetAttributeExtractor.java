@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.jasig.services.persondir.PersonAttributes;
-import org.jasig.services.persondir.core.PersonAttributesBuilder;
+import org.jasig.services.persondir.util.attributes.PersonAttributesBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.ResultSetExtractor;

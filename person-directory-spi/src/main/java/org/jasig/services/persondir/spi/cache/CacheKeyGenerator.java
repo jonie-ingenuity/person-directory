@@ -3,6 +3,7 @@ package org.jasig.services.persondir.spi.cache;
 import java.io.Serializable;
 import java.util.Map;
 
+import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.criteria.Criteria;
 
 /**
@@ -11,7 +12,7 @@ import org.jasig.services.persondir.criteria.Criteria;
  * @author Eric Dalquist
  */
 public interface CacheKeyGenerator {
-    Serializable generateCacheKey(Criteria c);
+    Serializable generateCriteriaCacheKey(AttributeQuery<Criteria> c);
     
-    Serializable generateCacheKey(Map<String, Object> m);
+    Serializable generateMapCacheKey(AttributeQuery<Map<String, Object>> m);
 }

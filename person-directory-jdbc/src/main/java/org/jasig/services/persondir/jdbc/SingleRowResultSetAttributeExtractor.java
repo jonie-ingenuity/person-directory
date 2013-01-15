@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.jasig.services.persondir.PersonAttributes;
-import org.jasig.services.persondir.core.ImmutablePersonAttributesImpl;
+import org.jasig.services.persondir.util.attributes.ImmutablePersonAttributesImpl;
 import org.springframework.jdbc.core.ColumnMapRowMapper;
 import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;

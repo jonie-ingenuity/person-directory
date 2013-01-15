@@ -1,14 +1,12 @@
 package org.jasig.services.persondir.core.config;
 
 import org.jasig.services.persondir.spi.BaseAttributeSource;
-import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 
 abstract class AbstractSearchableAttributeSourceConfigBuilder<
-            T extends SearchableAttributeSourceBuilder<T, G>, 
-            S extends BaseAttributeSource,
-            G extends AttributeSourceGate> 
-        extends AbstractAttributeSourceConfigBuilder<T, S, G> 
-        implements SearchableAttributeSourceBuilder<T, G>, SearchableAttributeSourceConfig<S, G> {
+            T extends SearchableAttributeSourceBuilder<T>, 
+            S extends BaseAttributeSource> 
+        extends AbstractAttributeSourceConfigBuilder<T, S> 
+        implements SearchableAttributeSourceBuilder<T>, SearchableAttributeSourceConfig<S> {
     
     private int maxResults;
     

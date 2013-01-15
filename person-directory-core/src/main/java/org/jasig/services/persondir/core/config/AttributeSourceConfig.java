@@ -11,11 +11,11 @@ import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.springframework.core.Ordered;
 
-public interface AttributeSourceConfig<S extends BaseAttributeSource, G extends AttributeSourceGate> extends Ordered {
+public interface AttributeSourceConfig<S extends BaseAttributeSource> extends Ordered {
 
     S getAttributeSource();
     
-    List<G> getGates();
+    List<AttributeSourceGate> getGates();
 
     Ehcache getResultCache();
 
