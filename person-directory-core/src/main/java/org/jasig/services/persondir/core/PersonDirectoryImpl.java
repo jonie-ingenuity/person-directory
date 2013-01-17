@@ -25,6 +25,7 @@ import org.jasig.services.persondir.core.worker.CriteriaSearchableAttributeQuery
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
+import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.jasig.services.persondir.util.criteria.CriteriaAttributeNamesHandler;
 import org.jasig.services.persondir.util.criteria.CriteriaWalker;
 import org.slf4j.Logger;
@@ -100,6 +101,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
     public List<Person> searchForPeople(Criteria query) {
         return searchForPeople(createDefaultQuery(query));
     }
+
     @Override
     public List<Person> searchForPeople(AttributeQuery<Criteria> attributeQuery) {
         /*
@@ -121,17 +123,24 @@ public class PersonDirectoryImpl implements PersonDirectory {
          * to show up
          * 
          * 
+         * First pass logic looks good, getting queries run and results back
+         * 
+         * Each PersonBuilder tracks all sources it has results for or should it track all sources that haven't been queried yet?
+         * 
          * TODO where to put attribute transformations
-         * TODO delete merge order/behavior
+         * TODO verify attribute source names are unique
          * 
          */
-        final Criteria originalCriteria = attributeQuery.getQuery();
-        
+
         //Structures to track attribute query worker progress
-        final Map<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+        final Map<
+                AttributeSourceConfig<?>, 
+                AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
             runningWorkers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
-        final Map<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+        final Map<
+                AttributeSourceConfig<?>, 
+                AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
             completeWorkers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
         final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
@@ -140,25 +149,55 @@ public class PersonDirectoryImpl implements PersonDirectory {
         //First Pass: runs the Criteria against any DAO that it matches against
         final Set<AttributeSourceConfig<?>> sourceConfigs = config.getSourceConfigs();
         for (final AttributeSourceConfig<?> sourceConfig : sourceConfigs) {
-            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
+
+            //Only run Criteria Searchable sources in the first pass since all we have is a original Criteria
+            //Check if the source config can run the original Criteria
+            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig && canRun(attributeQuery, sourceConfig)) {
                 final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
-                if (canRun(originalCriteria, criteriaSearchableSourceConfig)) {
-                    final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery);
-                    runningWorkers.put(sourceConfig, criteriaSearchableQueryWorker);
-                    
-                    final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
-                    criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
-                }
+                final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery);
+                runningWorkers.put(sourceConfig, criteriaSearchableQueryWorker);
+                
+                final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
+                criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
             }
         }
         
-        final Map<String, PersonAttributes> resultsMap = new LinkedHashMap<String, PersonAttributes>();
+        //Collects attribute results
+        final Map<String, PersonBuilder> resultBuilderMap = new LinkedHashMap<String, PersonBuilder>();
         
         //2..N Pass: uses each result as a 
         boolean resultHaveChanged = false;
         do {
             if (resultHaveChanged) {
-                //do pass 2..N queries on remaining sources
+                //do pass 2..N queries on remaining sources if the result set has changed as we might be able to run new queries
+                for (final AttributeSourceConfig<?> sourceConfig : sourceConfigs) {
+                    
+                    //If the source hasn't already been executed
+                    if (!completeWorkers.containsKey(sourceConfig) && !runningWorkers.containsKey(sourceConfig)) {
+                        for (final PersonBuilder personAttributesBuilder : resultBuilderMap.values()) {
+                            //Check if the attribute source can be run for this person
+                            final Criteria subqueryCriteria = personAttributesBuilder.getSubqueryCriteria();
+                            final AttributeQuery<Criteria> subAttributeQuery = new AttributeQuery<Criteria>(subqueryCriteria, attributeQuery);
+                            if (canRun(subAttributeQuery, sourceConfig)) {
+                                if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
+                                    final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
+                                    
+                                    final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, subAttributeQuery);
+                                    
+                                    runningWorkers.put(sourceConfig, criteriaSearchableQueryWorker);
+                                    
+                                    final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
+                                    criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
+                                }
+                                else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
+                                    
+                                } 
+                            }
+                            
+                            //TODO the 2..N pass workers should have the PersonAttributesBuilder that it was run for associated with it
+                        }
+                    }
+                }
             }
             
             //Reset resultsHaveChanged flag
@@ -185,33 +224,58 @@ public class PersonDirectoryImpl implements PersonDirectory {
                 // uhoh everything in-progress took longer than it should have and we can't have any new results at this point
                 // Cancel all in-progress workers and break out of the loop
                 for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers.values()) {
-                    queryWorker.cancel(true);
+                    queryWorker.cancelFuture(true);
                     break;
                 }
             }
             else {
+                //A worker has completed, get the result data from the worker and continue to loop on any additional workers
+                //that complete during result processing
                 while (completeWorker != null) {
                     //Move the worker from the running map into the complete map
                     final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = completeWorker.getSourceConfig();
                     runningWorkers.remove(sourceConfig);
                     completeWorkers.put(sourceConfig, completeWorker);
                     
+                    //Get the result/throwable
                     try {
                         final List<PersonAttributes> results = completeWorker.getResult();
-                        addResults(resultsMap, results);
+                        
+                        int resultIndex = 0;
+                        for (final PersonAttributes personAttributes : results) {
+                            resultIndex++;
+                            
+                            //Determine the primary id for the attributes
+                            final String primaryId = getPrimaryId(personAttributes);
+                            if (primaryId == null) {
+                                logger.warn("No primaryId {} present in result {} from {} for query {}, the result will be ignored.", 
+                                        primaryId, resultIndex, sourceConfig.getName(), completeWorker.getFilteredQuery());
+                            }
+                            
+                            //get/create PersonAttributesBuilder
+                            PersonBuilder resultBuilder = resultBuilderMap.get(primaryId);
+                            if (resultBuilder == null) {
+                                resultBuilder = new PersonBuilder(primaryId);
+                                resultBuilderMap.put(primaryId, resultBuilder);
+                            }
+                            
+                            //Merge the new results into the builder
+                            final boolean resultChanged = resultBuilder.mergeAttributes(personAttributes, sourceConfig);
+                            resultHaveChanged = resultChanged || resultHaveChanged;
+                        }
                     }
                     catch (Throwable t) {
                         logger.warn("'" + sourceConfig.getName() + "' threw an exception while retrieving attributes and will be ignored for query: " + completeWorker.getFilteredQuery(), t);
                     }
-                 
+
                     //Check if there are any more completed workers without waiting
                     completeWorker = completeWorkerQueue.poll();
                 }
             }
         } while (sourceConfigs.size() < completeWorkers.size() && resultHaveChanged);
         
-        
-        /* results processing
+        /* 
+         * results processing
          *  apply original critera to each result
          *  convert each PersonAttributes to a Person
          *  build into ImmutableList
@@ -221,14 +285,28 @@ public class PersonDirectoryImpl implements PersonDirectory {
         return null;
     }
     
-    protected void addResults(Map<String, PersonAttributes> resultsMap, List<PersonAttributes> results) {
-        //TODO
+    protected String getPrimaryId(PersonAttributes personAttributes) {
+        final String primaryIdAttribute = this.config.getPrimaryIdAttribute();
+        
+        final Map<String, List<Object>> attributes = personAttributes.getAttributes();
+        final List<Object> values = attributes.get(primaryIdAttribute);
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        
+        final Object value = values.get(0);
+        if (value == null) {
+            return null;
+        }
+        
+        return value.toString();
     }
     
-    protected boolean canRun(Criteria criteria, CriteriaSearchableAttributeSourceConfig sourceConfig) {
+    protected boolean canRun(AttributeQuery<Criteria> attributeQuery, AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig) {
+        //Capture attribute names from the criteria
+        final Criteria criteria = attributeQuery.getQuery();
         final CriteriaAttributeNamesHandler criteriaAttributeNamesHandler = new CriteriaAttributeNamesHandler();
         CriteriaWalker.walkCriteria(criteria, criteriaAttributeNamesHandler);
-        
         final Set<String> queryAttributeNames = criteriaAttributeNamesHandler.getAttributeNames();
         
         final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
@@ -241,25 +319,11 @@ public class PersonDirectoryImpl implements PersonDirectory {
             return false;
         }
         
-        //TODO gates
-        
-        return true;
-    }
-    
-    protected boolean canRun(Map<String, Object> attributes, SimpleAttributeSourceConfig sourceConfig) {
-        final Set<String> queryAttributeNames = attributes.keySet();
-        
-        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
-        final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
-        if (    //If there are required attributes the query map must contain all of them
-                (requiredQueryAttributes.isEmpty() || !queryAttributeNames.containsAll(requiredQueryAttributes))
-                &&
-                //If there are no required attributes the query map must contain at least one optional attribute
-                (!requiredQueryAttributes.isEmpty() || Collections.disjoint(queryAttributeNames, optionalQueryAttributes))) {
-            return false;
+        for (final AttributeSourceGate gate : sourceConfig.getGates()) {
+            if (!gate.checkSearch(attributeQuery)) {
+                return false;
+            }
         }
-        
-        //TODO gate check
         
         return true;
     }

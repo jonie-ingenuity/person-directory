@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
+import org.jasig.services.persondir.core.PersonBuilder;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
 import org.jasig.services.persondir.criteria.Criteria;
@@ -26,6 +27,16 @@ public class SimpleAttributeQueryWorker
 
         super(personDirectoryConfig, sourceConfig, attributeQuery);
     }
+    
+    public SimpleAttributeQueryWorker(
+            PersonDirectoryConfig personDirectoryConfig,
+            SimpleAttributeSourceConfig sourceConfig,
+            PersonBuilder personBuilder, AttributeQuery<Criteria> attributeQuery) {
+
+        super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery);
+    }
+
+
 
     @Override
     protected Serializable generateCacheKey(AttributeQuery<Map<String, Object>> attributeQuery, CacheKeyGenerator keyGenerator) {

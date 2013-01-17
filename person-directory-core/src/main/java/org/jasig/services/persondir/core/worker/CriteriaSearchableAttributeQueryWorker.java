@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
+import org.jasig.services.persondir.core.PersonBuilder;
 import org.jasig.services.persondir.core.config.CriteriaSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.criteria.Criteria;
@@ -23,6 +24,14 @@ public class CriteriaSearchableAttributeQueryWorker
             AttributeQuery<Criteria> attributeQuery) {
 
         super(personDirectoryConfig, sourceConfig, attributeQuery);
+    }
+    
+    public CriteriaSearchableAttributeQueryWorker(
+            PersonDirectoryConfig personDirectoryConfig,
+            CriteriaSearchableAttributeSourceConfig sourceConfig,
+            PersonBuilder personBuilder, AttributeQuery<Criteria> attributeQuery) {
+
+        super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery);
     }
 
 

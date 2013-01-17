@@ -11,6 +11,7 @@ import net.sf.ehcache.Element;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
+import org.jasig.services.persondir.core.PersonBuilder;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.criteria.Criteria;
@@ -38,6 +39,7 @@ public abstract class AbstractAttributeQueryWorker<
     
     protected final PersonDirectoryConfig personDirectoryConfig;
     protected final C sourceConfig;
+    protected final PersonBuilder personBuilder;
     protected final long timeout;
     protected final AttributeQuery<Q> filteredQuery;
     
@@ -58,12 +60,22 @@ public abstract class AbstractAttributeQueryWorker<
             C sourceConfig,
             AttributeQuery<Criteria> attributeQuery) {
         
+        this(personDirectoryConfig, sourceConfig, null, attributeQuery);
+    }
+    
+    public AbstractAttributeQueryWorker(
+            PersonDirectoryConfig personDirectoryConfig,
+            C sourceConfig,
+            PersonBuilder personBuilder,
+            AttributeQuery<Criteria> attributeQuery) {
+        
         Assert.notNull(personDirectoryConfig, "personDirectoryConfig cannot be null");
         Assert.notNull(sourceConfig, "sourceConfig cannot be null");
         Assert.notNull(attributeQuery, "attributeQuery cannot be null");
         
         this.personDirectoryConfig = personDirectoryConfig;
         this.sourceConfig = sourceConfig;
+        this.personBuilder = personBuilder;
         
         final Q query = filterQuery(attributeQuery.getQuery());
         this.filteredQuery = new AttributeQuery<Q>(query, attributeQuery);
@@ -233,15 +245,23 @@ public abstract class AbstractAttributeQueryWorker<
         return complete;
     }
     
-    public final boolean cancel(boolean mayInterruptIfRunning) {
+    public final PersonBuilder getPersonBuilder() {
+        return personBuilder;
+    }
+
+    public final boolean isComplete() {
+        return complete != -1;
+    }
+    
+    public final boolean cancelFuture(boolean mayInterruptIfRunning) {
         return futureResult.cancel(mayInterruptIfRunning);
     }
 
-    public final boolean isCancelled() {
+    public final boolean isFutureCancelled() {
         return futureResult.isCancelled();
     }
 
-    public final boolean isDone() {
+    public final boolean isFutureDone() {
         return futureResult.isDone();
     }
     

@@ -17,12 +17,20 @@ public final class CriteriaBuilder {
         return new BinaryLogicCriteria(LogicOperation.AND, c);
     }
     
+    public static LogicCriteriaBuilder andBuilder() {
+        return new LogicCriteriaBuilder(LogicOperation.AND);
+    }
+    
     public static Criteria or(Criteria... c) {
         return new BinaryLogicCriteria(LogicOperation.OR, c);
     }
     
     public static Criteria or(Collection<Criteria> c) {
         return new BinaryLogicCriteria(LogicOperation.OR, c);
+    }
+    
+    public static LogicCriteriaBuilder orBuilder() {
+        return new LogicCriteriaBuilder(LogicOperation.OR);
     }
     
     public static Criteria not(Criteria c) {

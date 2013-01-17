@@ -4,6 +4,7 @@ import org.jasig.services.persondir.criteria.BinaryLogicCriteria;
 import org.jasig.services.persondir.criteria.CompareCriteria;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.NotCriteria;
+import org.springframework.util.Assert;
 
 /**
  * Utility to walk a {@link Criteria} tree
@@ -17,6 +18,9 @@ public abstract class CriteriaWalker {
      * for each node.
      */
     public static void walkCriteria(Criteria c, CriteriaHandler handler) {
+        Assert.notNull(c, "Criteria must not be null");
+        Assert.notNull(handler, "CriteriaHandler must not be null");
+        
         final CriteriaWalkerImpl walker = new CriteriaWalkerImpl(handler);
         walker.walkCriteria(c);
     }
@@ -24,6 +28,8 @@ public abstract class CriteriaWalker {
     abstract CriteriaHandler getCriteriaHandler();
     
     public void walkCriteria(Criteria c) {
+        Assert.notNull(c, "Criteria must not be null");
+        
         final CriteriaHandler handler = this.getCriteriaHandler();
         if (c instanceof BinaryLogicCriteria) {
             handler.handleBinaryLogicCriteria((BinaryLogicCriteria)c, this);
