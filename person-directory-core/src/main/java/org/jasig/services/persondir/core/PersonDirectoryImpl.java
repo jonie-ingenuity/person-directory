@@ -1,7 +1,8 @@
 package org.jasig.services.persondir.core;
 
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
 import org.jasig.services.persondir.core.worker.AbstractAttributeQueryWorker;
 import org.jasig.services.persondir.core.worker.CriteriaSearchableAttributeQueryWorker;
+import org.jasig.services.persondir.core.worker.SimpleAttributeQueryWorker;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
@@ -43,20 +45,20 @@ public class PersonDirectoryImpl implements PersonDirectory {
      * Callback on worker completion that places the worker on the completeWorkerQueue
      */
     private static final class WorkerCompleteCallback implements Runnable {
-        private final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker;
+        private final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
         private final Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkerQueue;
 
-        private WorkerCompleteCallback(
-                CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker,
+        public WorkerCompleteCallback(
+                AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker,
                 Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkerQueue) {
-
-            this.criteriaSearchableQueryWorker = criteriaSearchableQueryWorker;
+            
+            this.queryWorker = queryWorker;
             this.completeWorkerQueue = completeWorkerQueue;
         }
-        
+
         @Override
         public void run() {
-            completeWorkerQueue.add(criteriaSearchableQueryWorker);
+            completeWorkerQueue.add(queryWorker);
         }
     }
 
@@ -131,72 +133,87 @@ public class PersonDirectoryImpl implements PersonDirectory {
          * TODO verify attribute source names are unique
          * 
          */
-
-        //Structures to track attribute query worker progress
-        final Map<
-                AttributeSourceConfig<?>, 
-                AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
-            runningWorkers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
-        final Map<
-                AttributeSourceConfig<?>, 
-                AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
-            completeWorkers = new HashMap<AttributeSourceConfig<?>, AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+        //Set of sources to be run in passes 2..N
+        final Set<AttributeSourceConfig<? extends BaseAttributeSource>> 
+            multiPassSources = new HashSet<AttributeSourceConfig<? extends BaseAttributeSource>>();
         
+        //Set of workers that have been submitted for execution
+        final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+            sourceQueryWorkers = new HashSet<AbstractAttributeQueryWorker<?,? extends BaseAttributeSource,? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+        
+        //Queue where workers are placed when they finish execution
         final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
             completeWorkerQueue = new LinkedBlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
         //First Pass: runs the Criteria against any DAO that it matches against
-        final Set<AttributeSourceConfig<?>> sourceConfigs = config.getSourceConfigs();
-        for (final AttributeSourceConfig<?> sourceConfig : sourceConfigs) {
+        for (final AttributeSourceConfig<?> sourceConfig : config.getSourceConfigs()) {
 
             //Only run Criteria Searchable sources in the first pass since all we have is a original Criteria
             //Check if the source config can run the original Criteria
             if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig && canRun(attributeQuery, sourceConfig)) {
                 final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
                 final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery);
-                runningWorkers.put(sourceConfig, criteriaSearchableQueryWorker);
+                sourceQueryWorkers.add(criteriaSearchableQueryWorker);
                 
                 final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
                 criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
+            }
+            //Sources that are not run on the first pass are added to the second pass set
+            else {
+                multiPassSources.add(sourceConfig);
             }
         }
         
         //Collects attribute results
         final Map<String, PersonBuilder> resultBuilderMap = new LinkedHashMap<String, PersonBuilder>();
         
-        //2..N Pass: uses each result as a 
+        //2..N Pass: uses each result as a
+        boolean hasMoreSources = !multiPassSources.isEmpty();
         boolean resultHaveChanged = false;
         do {
             if (resultHaveChanged) {
+                hasMoreSources = false;
+
                 //do pass 2..N queries on remaining sources if the result set has changed as we might be able to run new queries
-                for (final AttributeSourceConfig<?> sourceConfig : sourceConfigs) {
-                    
-                    //If the source hasn't already been executed
-                    if (!completeWorkers.containsKey(sourceConfig) && !runningWorkers.containsKey(sourceConfig)) {
-                        for (final PersonBuilder personAttributesBuilder : resultBuilderMap.values()) {
-                            //Check if the attribute source can be run for this person
-                            final Criteria subqueryCriteria = personAttributesBuilder.getSubqueryCriteria();
-                            final AttributeQuery<Criteria> subAttributeQuery = new AttributeQuery<Criteria>(subqueryCriteria, attributeQuery);
-                            if (canRun(subAttributeQuery, sourceConfig)) {
-                                if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
-                                    final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
-                                    
-                                    final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, subAttributeQuery);
-                                    
-                                    runningWorkers.put(sourceConfig, criteriaSearchableQueryWorker);
-                                    
-                                    final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
-                                    criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
-                                }
-                                else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
-                                    
-                                } 
+                for (final PersonBuilder personBuilder : resultBuilderMap.values()) {
+                    //Generate the critera and attribute query to use for subqueries on this person
+                    final Criteria subqueryCriteria = personBuilder.getSubqueryCriteria();
+                    final AttributeQuery<Criteria> subAttributeQuery = new AttributeQuery<Criteria>(subqueryCriteria, attributeQuery);
+
+                    //Iterate over all sources that have not yet been run for this person
+                    final Set<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSources = personBuilder.getPendingSources();
+                    for (final Iterator<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSourcesItr = pendingSources.iterator(); pendingSourcesItr.hasNext(); ) {
+                        final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = pendingSourcesItr.next();
+                        
+                        //Check if the source can execute this query
+                        if (canRun(subAttributeQuery, sourceConfig)) {
+                            
+                            final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
+                            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
+                                final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
+                                queryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, subAttributeQuery);
+                            }
+                            else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
+                                final SimpleAttributeSourceConfig simpleAttributeSourceConfig = (SimpleAttributeSourceConfig)sourceConfig;
+                                queryWorker = new SimpleAttributeQueryWorker(this.config, simpleAttributeSourceConfig, subAttributeQuery);
+                            }
+                            else {
+                                throw new IllegalArgumentException(sourceConfig.getClass() + " is not a supported AttributeSourceConfig implementation");
                             }
                             
-                            //TODO the 2..N pass workers should have the PersonAttributesBuilder that it was run for associated with it
+                            //Add to set of tracked workers
+                            sourceQueryWorkers.add(queryWorker);
+                            
+                            //Create worker complete callback and submit the worker
+                            final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(queryWorker, completeWorkerQueue);
+                            queryWorker.submit(attributeSourceExecutor, futureCallback);
+                            
+                            pendingSourcesItr.remove();
                         }
                     }
+                    
+                    hasMoreSources = hasMoreSources || !pendingSources.isEmpty();
                 }
             }
             
@@ -205,7 +222,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
             
             //Calculate the maximum time to wait for a result based on the currently executing workers
             long maxWaitTime = 0;
-            for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers.values()) {
+            for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : sourceQueryWorkers) {
                 maxWaitTime = Math.max(maxWaitTime, queryWorker.getCurrentWaitTime());
             }
             
@@ -223,7 +240,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
             if (completeWorker == null) {
                 // uhoh everything in-progress took longer than it should have and we can't have any new results at this point
                 // Cancel all in-progress workers and break out of the loop
-                for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers.values()) {
+                for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : sourceQueryWorkers) {
                     queryWorker.cancelFuture(true);
                     break;
                 }
@@ -234,8 +251,6 @@ public class PersonDirectoryImpl implements PersonDirectory {
                 while (completeWorker != null) {
                     //Move the worker from the running map into the complete map
                     final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = completeWorker.getSourceConfig();
-                    runningWorkers.remove(sourceConfig);
-                    completeWorkers.put(sourceConfig, completeWorker);
                     
                     //Get the result/throwable
                     try {
@@ -255,7 +270,8 @@ public class PersonDirectoryImpl implements PersonDirectory {
                             //get/create PersonAttributesBuilder
                             PersonBuilder resultBuilder = resultBuilderMap.get(primaryId);
                             if (resultBuilder == null) {
-                                resultBuilder = new PersonBuilder(primaryId);
+                                final AttributeQuery<Criteria> originalQuery = completeWorker.getOriginalQuery();
+                                resultBuilder = new PersonBuilder(primaryId, originalQuery.getQuery(), multiPassSources);
                                 resultBuilderMap.put(primaryId, resultBuilder);
                             }
                             
@@ -272,7 +288,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
                     completeWorker = completeWorkerQueue.poll();
                 }
             }
-        } while (sourceConfigs.size() < completeWorkers.size() && resultHaveChanged);
+        } while (hasMoreSources && resultHaveChanged);
         
         /* 
          * results processing

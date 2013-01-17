@@ -1,5 +1,6 @@
 package org.jasig.services.persondir.core.config;
 
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -8,6 +9,7 @@ import net.sf.ehcache.Ehcache;
 
 import org.jasig.services.persondir.PersonDirectory;
 import org.jasig.services.persondir.core.PersonDirectoryImpl;
+import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
@@ -32,7 +34,8 @@ final class PersonDirectoryConfigBuilder
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     
     private Set<AbstractAttributeSourceConfigBuilder<?, ?>> sourceBuilders = new LinkedHashSet<AbstractAttributeSourceConfigBuilder<?, ?>>();
-    private Set<AttributeSourceConfig<?>> sourceConfigs;
+    private Set<AttributeSourceConfig<? extends BaseAttributeSource>> sourceConfigs;
+    private Set<String> sourceConfigNames = new HashSet<String>();
     
     private final String primaryIdAttribute;
     private String executorServiceName;
@@ -57,11 +60,12 @@ final class PersonDirectoryConfigBuilder
         final BeanFactory beanFactory = this.getBeanFactory();
         
         //Initialize and copy all attribute sources
-        final Builder<AttributeSourceConfig<?>> sourceConfigsBuilder = ImmutableSet.builder();
+        final Builder<AttributeSourceConfig<? extends BaseAttributeSource>> sourceConfigsBuilder = ImmutableSet.builder();
         for (final AbstractAttributeSourceConfigBuilder<?, ?> configBuilder : this.sourceBuilders) {
             configBuilder.resolveConfiguration(beanFactory);
             sourceConfigsBuilder.add(configBuilder);
         }
+        this.sourceConfigNames = null;
         this.sourceBuilders = null;
         this.sourceConfigs = sourceConfigsBuilder.build();
         
@@ -183,6 +187,9 @@ final class PersonDirectoryConfigBuilder
 
     @Override
     public SimpleAttributeSourceBuilder addAttributeSource(SimpleAttributeSource source, String name) {
+        if (!sourceConfigNames.add(name)) {
+            throw new IllegalArgumentException("An attribute source with name '" + name + "' already exists");
+        }
         final SimpleAttributeSourceConfigBuilder sourceBuilder = new SimpleAttributeSourceConfigBuilder(source, name);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
@@ -190,6 +197,9 @@ final class PersonDirectoryConfigBuilder
     
     @Override
     public CriteriaSearchableAttributeSourceBuilder addAttributeSource(CriteriaSearchableAttributeSource source, String name) {
+        if (!sourceConfigNames.add(name)) {
+            throw new IllegalArgumentException("An attribute source with name '" + name + "' already exists");
+        }
         final CriteriaSearchableAttributeSourceConfigBuilder sourceBuilder = new CriteriaSearchableAttributeSourceConfigBuilder(source, name);
         sourceBuilders.add(sourceBuilder);
         return sourceBuilder;
@@ -202,7 +212,7 @@ final class PersonDirectoryConfigBuilder
     }
     
     @Override
-    public Set<AttributeSourceConfig<?>> getSourceConfigs() {
+    public Set<AttributeSourceConfig<? extends BaseAttributeSource>> getSourceConfigs() {
         if (this.sourceConfigs == null) {
             throw new IllegalStateException("resolveConfiguration(BeanFactory) must be called first.");
         }

@@ -5,10 +5,11 @@ import java.util.concurrent.ExecutorService;
 
 import net.sf.ehcache.Ehcache;
 
+import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 
 public interface PersonDirectoryConfig {
-    Set<AttributeSourceConfig<?>> getSourceConfigs();
+    Set<AttributeSourceConfig<? extends BaseAttributeSource>> getSourceConfigs();
     
     String getPrimaryIdAttribute();
     

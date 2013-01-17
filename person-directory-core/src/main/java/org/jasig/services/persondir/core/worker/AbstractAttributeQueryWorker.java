@@ -41,6 +41,7 @@ public abstract class AbstractAttributeQueryWorker<
     protected final C sourceConfig;
     protected final PersonBuilder personBuilder;
     protected final long timeout;
+    protected final AttributeQuery<Criteria> originalQuery;
     protected final AttributeQuery<Q> filteredQuery;
     
     private volatile Serializable cachedCacheKey;
@@ -77,6 +78,7 @@ public abstract class AbstractAttributeQueryWorker<
         this.sourceConfig = sourceConfig;
         this.personBuilder = personBuilder;
         
+        this.originalQuery = attributeQuery;
         final Q query = filterQuery(attributeQuery.getQuery());
         this.filteredQuery = new AttributeQuery<Q>(query, attributeQuery);
         
@@ -224,6 +226,13 @@ public abstract class AbstractAttributeQueryWorker<
         return this.filteredQuery;
     }
     
+    /**
+     * @return The original query passed to the worker
+     */
+    public final AttributeQuery<Criteria> getOriginalQuery() {
+        return originalQuery;
+    }
+
     /**
      * @return The time submitted, -1 if not yet submitted
      */

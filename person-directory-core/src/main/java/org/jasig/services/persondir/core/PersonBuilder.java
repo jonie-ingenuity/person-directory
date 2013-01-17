@@ -1,9 +1,11 @@
 package org.jasig.services.persondir.core;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
@@ -26,9 +28,12 @@ public class PersonBuilder {
     private final Map<String, AttributeSourceConfig<? extends BaseAttributeSource>> attributeSources = new HashMap<String, AttributeSourceConfig<? extends BaseAttributeSource>>();
     private final LogicCriteriaBuilder subqueryCriteria = CriteriaBuilder.andBuilder();
     private final String primaryId;
+    private final Set<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSources;
     
-    public PersonBuilder(String primaryId) {
+    public PersonBuilder(String primaryId, Criteria originalCriteria, Set<AttributeSourceConfig<? extends BaseAttributeSource>> multiPassSources) {
         this.primaryId = primaryId;
+        this.pendingSources = new HashSet<AttributeSourceConfig<? extends BaseAttributeSource>>(multiPassSources);
+        this.subqueryCriteria.add(originalCriteria);
     }
 
     public boolean mergeAttributes(PersonAttributes personAttributes, AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig) {
@@ -73,6 +78,10 @@ public class PersonBuilder {
         return this.attributeSources.get(attribute);
     }
     
+    public Set<AttributeSourceConfig<? extends BaseAttributeSource>> getPendingSources() {
+        return pendingSources;
+    }
+
     public Criteria getSubqueryCriteria() {
         return subqueryCriteria.build();
     }
