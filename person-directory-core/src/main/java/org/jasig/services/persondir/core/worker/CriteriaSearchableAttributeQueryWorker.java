@@ -2,13 +2,16 @@ package org.jasig.services.persondir.core.worker;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Queue;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.core.PersonBuilder;
+import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.CriteriaSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.criteria.Criteria;
+import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 
@@ -21,22 +24,26 @@ public class CriteriaSearchableAttributeQueryWorker
     public CriteriaSearchableAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
             CriteriaSearchableAttributeSourceConfig sourceConfig,
-            AttributeQuery<Criteria> attributeQuery) {
+            AttributeQuery<Criteria> attributeQuery,
+            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
-        super(personDirectoryConfig, sourceConfig, attributeQuery);
+        super(personDirectoryConfig, sourceConfig, attributeQuery, completedWorkerQueue);
     }
-    
+
+
     public CriteriaSearchableAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
             CriteriaSearchableAttributeSourceConfig sourceConfig,
-            PersonBuilder personBuilder, AttributeQuery<Criteria> attributeQuery) {
+            PersonBuilder personBuilder,
+            AttributeQuery<Criteria> attributeQuery,
+            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
-        super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery);
+        super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery, completedWorkerQueue);
     }
 
 
     @Override
-    protected AttributeQueryCallable createQueryCallable(
+    protected AttributeQueryTask createQueryCallable(
             AttributeQuery<Criteria> filteredQuery) {
         return new CriteriaSearchableAttributeQueryCallable(filteredQuery);
     }
@@ -53,7 +60,7 @@ public class CriteriaSearchableAttributeQueryWorker
         return null;
     }
 
-    private final class CriteriaSearchableAttributeQueryCallable extends AttributeQueryCallable {
+    private final class CriteriaSearchableAttributeQueryCallable extends AttributeQueryTask {
         private final AttributeQuery<Criteria> attributeQuery;
         
         public CriteriaSearchableAttributeQueryCallable(AttributeQuery<Criteria> attributeQuery) {
@@ -62,7 +69,7 @@ public class CriteriaSearchableAttributeQueryWorker
 
         @Override
         protected List<PersonAttributes> doQuery() {
-            final CriteriaSearchableAttributeSource attributeSource = sourceConfig.getAttributeSource();
+            final CriteriaSearchableAttributeSource attributeSource = getSourceConfig().getAttributeSource();
             return attributeSource.searchForAttributes(this.attributeQuery);
         }
     }

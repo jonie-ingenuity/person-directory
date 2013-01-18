@@ -25,7 +25,7 @@ public class SingleRowResultSetAttributeExtractor
         
         for (int rowNum = 0; rs.next(); rowNum++) {
             final Map<String, Object> rowMap = this.rowMapper.mapRow(rs, rowNum);
-            results.add(new ImmutablePersonAttributesImpl(rowMap));
+            results.add(ImmutablePersonAttributesImpl.create(rowMap));
         }
         
         return results;

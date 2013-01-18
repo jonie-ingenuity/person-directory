@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.jasig.services.persondir.PersonAttributes;
+import org.springframework.util.Assert;
 import org.springframework.util.LinkedCaseInsensitiveMap;
 
 /**
@@ -15,8 +16,25 @@ import org.springframework.util.LinkedCaseInsensitiveMap;
 public class ImmutablePersonAttributesImpl implements PersonAttributes {
     private final Map<String, List<Object>> attributes;
     
-    public ImmutablePersonAttributesImpl(Map<String, ?> attributes) {
-        final Map<String, List<Object>> attributesBuilder = new LinkedCaseInsensitiveMap<List<Object>>();
+    /**
+     * Should only be called if passing in a {@link LinkedCaseInsensitiveMap} that will have no external
+     * references, this class will wrap it in an unmodifiable wrapper but not clone the original
+     * map.
+     * 
+     * Generic usage should use {@link ImmutablePersonAttributesImpl#create(Map)}
+     */
+    protected ImmutablePersonAttributesImpl(LinkedCaseInsensitiveMap<List<Object>> attributes) {
+        Assert.notNull(attributes, "attributes must not be null");
+        this.attributes = Collections.unmodifiableMap(attributes);
+    }
+    
+    /**
+     * @return A new ImmutablePersonAttributesImpl based on the attributes
+     */
+    public static ImmutablePersonAttributesImpl create(Map<String, ?> attributes) {
+        Assert.notNull(attributes, "attributes must not be null");
+        
+        final LinkedCaseInsensitiveMap<List<Object>> attributesBuilder = new LinkedCaseInsensitiveMap<List<Object>>();
         
         for (final Map.Entry<String, ?> attributeEntry : attributes.entrySet()) {
             final String name = attributeEntry.getKey();
@@ -28,10 +46,9 @@ public class ImmutablePersonAttributesImpl implements PersonAttributes {
             else {
                 attributesBuilder.put(name, Collections.singletonList(value));
             }
-            
         }
         
-        this.attributes = Collections.unmodifiableMap(attributesBuilder);
+        return new ImmutablePersonAttributesImpl(attributesBuilder);
     }
     
     @Override
@@ -67,6 +84,6 @@ public class ImmutablePersonAttributesImpl implements PersonAttributes {
 
     @Override
     public String toString() {
-        return "PersonAttributes: " + attributes;
+        return attributes.toString();
     }
 }

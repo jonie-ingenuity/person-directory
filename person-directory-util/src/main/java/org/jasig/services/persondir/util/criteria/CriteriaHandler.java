@@ -11,6 +11,6 @@ import org.jasig.services.persondir.criteria.NotCriteria;
  */
 public interface CriteriaHandler {
     void handleBinaryLogicCriteria(BinaryLogicCriteria c, CriteriaWalker walker);
-    void handleCompareCriteria(CompareCriteria c, CriteriaWalker walker);
+    void handleCompareCriteria(CompareCriteria<?> c, CriteriaWalker walker);
     void handleNotCriteria(NotCriteria c, CriteriaWalker walker);
 }

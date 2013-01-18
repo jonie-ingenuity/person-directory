@@ -3,13 +3,12 @@ package org.jasig.services.persondir.util.attributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 import org.jasig.services.persondir.PersonAttributes;
 import org.springframework.util.LinkedCaseInsensitiveMap;
 
 public class PersonAttributesBuilder {
-    final Map<String, List<Object>> attributes = new LinkedCaseInsensitiveMap<List<Object>>();
+    final LinkedCaseInsensitiveMap<List<Object>> attributes = new LinkedCaseInsensitiveMap<List<Object>>();
     
     public PersonAttributes build() {
         return new ImmutablePersonAttributesImpl(attributes);

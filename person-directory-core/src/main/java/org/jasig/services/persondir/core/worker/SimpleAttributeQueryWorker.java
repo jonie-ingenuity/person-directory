@@ -4,13 +4,16 @@ import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.core.PersonBuilder;
+import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
 import org.jasig.services.persondir.criteria.Criteria;
+import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 
@@ -23,20 +26,21 @@ public class SimpleAttributeQueryWorker
     public SimpleAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
             SimpleAttributeSourceConfig sourceConfig,
-            AttributeQuery<Criteria> attributeQuery) {
+            AttributeQuery<Criteria> attributeQuery,
+            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
-        super(personDirectoryConfig, sourceConfig, attributeQuery);
+        super(personDirectoryConfig, sourceConfig, attributeQuery, completedWorkerQueue);
     }
-    
+
     public SimpleAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
             SimpleAttributeSourceConfig sourceConfig,
-            PersonBuilder personBuilder, AttributeQuery<Criteria> attributeQuery) {
+            PersonBuilder personBuilder,
+            AttributeQuery<Criteria> attributeQuery,
+            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
-        super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery);
+        super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery, completedWorkerQueue);
     }
-
-
 
     @Override
     protected Serializable generateCacheKey(AttributeQuery<Map<String, Object>> attributeQuery, CacheKeyGenerator keyGenerator) {
@@ -61,11 +65,11 @@ final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttribu
     }
 
     @Override
-    protected AttributeQueryCallable createQueryCallable(AttributeQuery<Map<String, Object>> filteredQuery) {
+    protected AttributeQueryTask createQueryCallable(AttributeQuery<Map<String, Object>> filteredQuery) {
         return new SimpleAttributeQueryCallable(filteredQuery);
     }
 
-    private final class SimpleAttributeQueryCallable extends AttributeQueryCallable {
+    private final class SimpleAttributeQueryCallable extends AttributeQueryTask {
         private final AttributeQuery<Map<String, Object>> attributeQuery;
         
         public SimpleAttributeQueryCallable(AttributeQuery<Map<String, Object>> attributeQuery) {
@@ -74,7 +78,7 @@ final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttribu
 
         @Override
         protected List<PersonAttributes> doQuery() {
-            final SimpleAttributeSource attributeSource = sourceConfig.getAttributeSource();
+            final SimpleAttributeSource attributeSource = getSourceConfig().getAttributeSource();
             final PersonAttributes result = attributeSource.findPersonAttributes(attributeQuery);
             return Collections.singletonList(result);
         }

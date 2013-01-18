@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -34,39 +33,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 
-public class PersonDirectoryImpl implements PersonDirectory {
-    
-    /**
-     * Callback on worker completion that places the worker on the completeWorkerQueue
-     */
-    private static final class WorkerCompleteCallback implements Runnable {
-        private final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
-        private final Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkerQueue;
-
-        public WorkerCompleteCallback(
-                AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker,
-                Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkerQueue) {
-            
-            this.queryWorker = queryWorker;
-            this.completeWorkerQueue = completeWorkerQueue;
-        }
-
-        @Override
-        public void run() {
-            completeWorkerQueue.add(queryWorker);
-        }
-    }
-
-
+public final class PersonDirectoryImpl implements PersonDirectory {
     protected final Logger logger = LoggerFactory.getLogger(getClass()); 
     
     protected final PersonDirectoryConfig config;
-    private final ListeningExecutorService attributeSourceExecutor;
+    private final ExecutorService attributeSourceExecutor;
 
     public PersonDirectoryImpl(PersonDirectoryConfig config) {
         this.config = config;
@@ -78,7 +54,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
             this.attributeSourceExecutor = MoreExecutors.sameThreadExecutor();
         }
         else {
-            this.attributeSourceExecutor = MoreExecutors.listeningDecorator(executorService);
+            this.attributeSourceExecutor = executorService;
         }
     }
 
@@ -107,129 +83,53 @@ public class PersonDirectoryImpl implements PersonDirectory {
     @Override
     public List<Person> searchForPeople(AttributeQuery<Criteria> attributeQuery) {
         /*
-         * see BaseAdditiveAttributeMerger.mergeResults for ideas on how to merge to result lists
-         *      SPI is string/obj but result is string/list<obj> - how do I deal with this missmatch?
-         *      
-         * pass 1 uses original Criteria against all DAOs that it can match against
-         *  extra attributes in the critera are filtered out for that dao
-         * pass 2..N treats each result in the result set as a big OR criteria
-         * after no more sources or no new result mods the final result list is filtered by applying the original Criteria
-         * 
-         * problems with this ... using OR for the subsequent queries would result in exponential growth
-         *  we are looking for additional data for a single user so the attributes in the sub-queries should use AND
-         *
-         * Do we need a Map dao? yes for single result sources that have no concept of "searching"
-         * 
-         * For work execution use a ListenableFuture with a MoreExecutors.sameThreadExecutor() to push the result
-         * onto a concurrent queue. The main thread can then simply wait on the concurrent queue for new results
-         * to show up
-         * 
-         * 
-         * First pass logic looks good, getting queries run and results back
-         * 
-         * Each PersonBuilder tracks all sources it has results for or should it track all sources that haven't been queried yet?
-         * 
-         * TODO where to put attribute transformations
-         * TODO verify attribute source names are unique
-         * 
+         * TODO attribute transformation API (includes mapping)
+         * TODO merge cache
          */
-        
-        //Set of sources to be run in passes 2..N
-        final Set<AttributeSourceConfig<? extends BaseAttributeSource>> 
-            multiPassSources = new HashSet<AttributeSourceConfig<? extends BaseAttributeSource>>();
         
         //Set of workers that have been submitted for execution
         final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
-            sourceQueryWorkers = new HashSet<AbstractAttributeQueryWorker<?,? extends BaseAttributeSource,? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+            runningWorkers = new HashSet<AbstractAttributeQueryWorker<?,? extends BaseAttributeSource,? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
         //Queue where workers are placed when they finish execution
         final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
-            completeWorkerQueue = new LinkedBlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+            completeWorkers = new LinkedBlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
+        //Set of sources to be run in passes 2..N
         //First Pass: runs the Criteria against any DAO that it matches against
-        for (final AttributeSourceConfig<?> sourceConfig : config.getSourceConfigs()) {
-
-            //Only run Criteria Searchable sources in the first pass since all we have is a original Criteria
-            //Check if the source config can run the original Criteria
-            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig && canRun(attributeQuery, sourceConfig)) {
-                final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
-                final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery);
-                sourceQueryWorkers.add(criteriaSearchableQueryWorker);
-                
-                final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(criteriaSearchableQueryWorker, completeWorkerQueue);
-                criteriaSearchableQueryWorker.submit(attributeSourceExecutor, futureCallback);
-            }
-            //Sources that are not run on the first pass are added to the second pass set
-            else {
-                multiPassSources.add(sourceConfig);
-            }
-        }
+        final Set<AttributeSourceConfig<? extends BaseAttributeSource>> 
+            multiPassSources = this.runFirstPassSources(attributeQuery, runningWorkers, completeWorkers);
         
         //Collects attribute results
-        final Map<String, PersonBuilder> resultBuilderMap = new LinkedHashMap<String, PersonBuilder>();
-        
-        //2..N Pass: uses each result as a
+        final Map<String, PersonBuilder> personBuilders = new LinkedHashMap<String, PersonBuilder>();
+
+        //Track if there are more sources to execute
         boolean hasMoreSources = !multiPassSources.isEmpty();
+        //Track if the result set has changed
         boolean resultHaveChanged = false;
         do {
+            //We have new results, execute any pending sources on the current result set
             if (resultHaveChanged) {
+                //Reset hasMoreSources so that it is only true if one of the results actually has more sources to run
                 hasMoreSources = false;
 
                 //do pass 2..N queries on remaining sources if the result set has changed as we might be able to run new queries
-                for (final PersonBuilder personBuilder : resultBuilderMap.values()) {
-                    //Generate the critera and attribute query to use for subqueries on this person
-                    final Criteria subqueryCriteria = personBuilder.getSubqueryCriteria();
-                    final AttributeQuery<Criteria> subAttributeQuery = new AttributeQuery<Criteria>(subqueryCriteria, attributeQuery);
-
-                    //Iterate over all sources that have not yet been run for this person
-                    final Set<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSources = personBuilder.getPendingSources();
-                    for (final Iterator<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSourcesItr = pendingSources.iterator(); pendingSourcesItr.hasNext(); ) {
-                        final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = pendingSourcesItr.next();
-                        
-                        //Check if the source can execute this query
-                        if (canRun(subAttributeQuery, sourceConfig)) {
-                            
-                            final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
-                            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
-                                final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
-                                queryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, subAttributeQuery);
-                            }
-                            else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
-                                final SimpleAttributeSourceConfig simpleAttributeSourceConfig = (SimpleAttributeSourceConfig)sourceConfig;
-                                queryWorker = new SimpleAttributeQueryWorker(this.config, simpleAttributeSourceConfig, subAttributeQuery);
-                            }
-                            else {
-                                throw new IllegalArgumentException(sourceConfig.getClass() + " is not a supported AttributeSourceConfig implementation");
-                            }
-                            
-                            //Add to set of tracked workers
-                            sourceQueryWorkers.add(queryWorker);
-                            
-                            //Create worker complete callback and submit the worker
-                            final WorkerCompleteCallback futureCallback = new WorkerCompleteCallback(queryWorker, completeWorkerQueue);
-                            queryWorker.submit(attributeSourceExecutor, futureCallback);
-                            
-                            pendingSourcesItr.remove();
-                        }
-                    }
-                    
-                    hasMoreSources = hasMoreSources || !pendingSources.isEmpty();
+                for (final PersonBuilder personBuilder : personBuilders.values()) {
+                    final boolean hasMorePending = this.runPendingSources(personBuilder, attributeQuery, runningWorkers, completeWorkers);
+                    hasMoreSources = hasMoreSources || hasMorePending;
                 }
             }
             
-            //Reset resultsHaveChanged flag
+            //Reset resultsHaveChanged flag so that it is only true if we get additional result data from the currently executing workers
             resultHaveChanged = false;
             
             //Calculate the maximum time to wait for a result based on the currently executing workers
-            long maxWaitTime = 0;
-            for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : sourceQueryWorkers) {
-                maxWaitTime = Math.max(maxWaitTime, queryWorker.getCurrentWaitTime());
-            }
+            long maxWaitTime = getMaxWaitTime(runningWorkers);
             
-            //Wait for a result to appear in the completeWorkerQueue
+            //Wait for a result to appear in the completeWorker Queue
             AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker = null;
             try {
-                completeWorker = completeWorkerQueue.poll(maxWaitTime, TimeUnit.MILLISECONDS);
+                completeWorker = completeWorkers.poll(maxWaitTime, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 //Interrupted by something while waiting for a result, assume we need to abort blocking operations and just return
                 //mark the thread as interrupted and break out of the wait-for-results loop
@@ -240,7 +140,7 @@ public class PersonDirectoryImpl implements PersonDirectory {
             if (completeWorker == null) {
                 // uhoh everything in-progress took longer than it should have and we can't have any new results at this point
                 // Cancel all in-progress workers and break out of the loop
-                for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : sourceQueryWorkers) {
+                for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers) {
                     queryWorker.cancelFuture(true);
                     break;
                 }
@@ -249,56 +149,181 @@ public class PersonDirectoryImpl implements PersonDirectory {
                 //A worker has completed, get the result data from the worker and continue to loop on any additional workers
                 //that complete during result processing
                 while (completeWorker != null) {
-                    //Move the worker from the running map into the complete map
-                    final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = completeWorker.getSourceConfig();
+                    //Remove the worker from the workers set
+                    runningWorkers.remove(completeWorker);
                     
-                    //Get the result/throwable
-                    try {
-                        final List<PersonAttributes> results = completeWorker.getResult();
-                        
-                        int resultIndex = 0;
-                        for (final PersonAttributes personAttributes : results) {
-                            resultIndex++;
-                            
-                            //Determine the primary id for the attributes
-                            final String primaryId = getPrimaryId(personAttributes);
-                            if (primaryId == null) {
-                                logger.warn("No primaryId {} present in result {} from {} for query {}, the result will be ignored.", 
-                                        primaryId, resultIndex, sourceConfig.getName(), completeWorker.getFilteredQuery());
-                            }
-                            
-                            //get/create PersonAttributesBuilder
-                            PersonBuilder resultBuilder = resultBuilderMap.get(primaryId);
-                            if (resultBuilder == null) {
-                                final AttributeQuery<Criteria> originalQuery = completeWorker.getOriginalQuery();
-                                resultBuilder = new PersonBuilder(primaryId, originalQuery.getQuery(), multiPassSources);
-                                resultBuilderMap.put(primaryId, resultBuilder);
-                            }
-                            
-                            //Merge the new results into the builder
-                            final boolean resultChanged = resultBuilder.mergeAttributes(personAttributes, sourceConfig);
-                            resultHaveChanged = resultChanged || resultHaveChanged;
-                        }
-                    }
-                    catch (Throwable t) {
-                        logger.warn("'" + sourceConfig.getName() + "' threw an exception while retrieving attributes and will be ignored for query: " + completeWorker.getFilteredQuery(), t);
-                    }
+                    //Handle the completed worker
+                    resultHaveChanged = resultHaveChanged || handleCompleteWorker(completeWorker, personBuilders, multiPassSources);
 
                     //Check if there are any more completed workers without waiting
-                    completeWorker = completeWorkerQueue.poll();
+                    completeWorker = completeWorkers.poll();
                 }
             }
         } while (hasMoreSources && resultHaveChanged);
         
-        /* 
-         * results processing
-         *  apply original critera to each result
-         *  convert each PersonAttributes to a Person
-         *  build into ImmutableList
-         * 
-         */
+        final Criteria originalCriteria = attributeQuery.getQuery();
         
-        return null;
+        final ImmutableList.Builder<Person> results = ImmutableList.builder();
+        for (final PersonBuilder personBuilder : personBuilders.values()) {
+            final Map<String, List<Object>> attributes = personBuilder.getAttributes();
+            if (originalCriteria.equals(attributes)) {
+                //Only include results that match the original filter
+                results.add(personBuilder.build());
+            }
+        }
+        
+        //TODO cache this in the mergeCache
+        return results.build();
+    }
+
+    /**
+     * @return true if the handling of the completed worker modified the overal result set 
+     */
+    protected boolean handleCompleteWorker(
+            AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker,
+            Map<String, PersonBuilder> personBuilders,
+            Set<AttributeSourceConfig<? extends BaseAttributeSource>> multiPassSources) {
+        
+        boolean resultHaveChanged = false;
+        
+        //Get the result/error from the complete worker
+        final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = completeWorker.getSourceConfig();
+        try {
+            final List<PersonAttributes> results = completeWorker.getResult();
+            
+            int resultIndex = 0;
+            for (final PersonAttributes personAttributes : results) {
+                resultIndex++;
+                
+                //Determine the primary id for the attributes
+                final String primaryId = getPrimaryId(personAttributes);
+
+                //Determine the PersonBuilder to merge the attributes into
+                PersonBuilder personBuilder;
+                if (primaryId != null) {
+                    //get/create PersonAttributesBuilder based on the primary id
+                    personBuilder = personBuilders.get(primaryId);
+                    if (personBuilder == null) {
+                        final AttributeQuery<Criteria> originalQuery = completeWorker.getOriginalQuery();
+                        personBuilder = new PersonBuilder(primaryId, originalQuery.getQuery(), multiPassSources);
+                        personBuilders.put(primaryId, personBuilder);
+                    }
+                }
+                else {
+                    //Use the person builder the worker was executed as a sub-query for
+                    personBuilder = completeWorker.getPersonBuilder();
+                }
+
+                if (personBuilder != null) {
+                    //Merge the new results into the builder
+                    resultHaveChanged = resultHaveChanged || personBuilder.mergeAttributes(personAttributes, sourceConfig);
+                }
+                else {
+                    logger.warn("No primaryId {} present in result {} from {} for query {}, the result will be ignored.", 
+                            primaryId, resultIndex, sourceConfig.getName(), completeWorker.getFilteredQuery());
+                }
+            }
+        }
+        catch (Throwable t) {
+            logger.warn("'" + sourceConfig.getName() + "' threw an exception while retrieving attributes for query and will be ignored for query: " + completeWorker.getFilteredQuery(), t);
+        }
+        
+        return resultHaveChanged;
+    }
+
+    /**
+     * @return The set of sources that were not executed on the first pass
+     */
+    protected Set<AttributeSourceConfig<? extends BaseAttributeSource>> runFirstPassSources(
+            AttributeQuery<Criteria> attributeQuery,
+            final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers,
+            final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkers) {
+        
+        final Set<AttributeSourceConfig<? extends BaseAttributeSource>> 
+            multiPassSources = new HashSet<AttributeSourceConfig<? extends BaseAttributeSource>>();
+        
+        for (final AttributeSourceConfig<?> sourceConfig : config.getSourceConfigs()) {
+
+            //Only run Criteria Searchable sources in the first pass since all we have is a original Criteria
+            //Check if the source config can run the original Criteria
+            if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig && canRun(attributeQuery, sourceConfig)) {
+                final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
+                final CriteriaSearchableAttributeQueryWorker criteriaSearchableQueryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, attributeQuery, completeWorkers);
+                runningWorkers.add(criteriaSearchableQueryWorker);
+                
+                criteriaSearchableQueryWorker.submit(attributeSourceExecutor);
+            }
+            //Sources that are not run on the first pass are added to the second pass set
+            else {
+                multiPassSources.add(sourceConfig);
+            }
+        }
+        
+        return multiPassSources;
+    }
+
+    /**
+     * @return The maximum time to wait from "now" for all workers currently in the runningWorkers set to reach their maximum execution time
+     */
+    protected long getMaxWaitTime(Set<AbstractAttributeQueryWorker<?, ?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers) {
+        long maxWaitTime = 0;
+        for (final AbstractAttributeQueryWorker<?, ?, ?> queryWorker : runningWorkers) {
+            maxWaitTime = Math.max(maxWaitTime, queryWorker.getCurrentWaitTime());
+        }
+        return maxWaitTime;
+    }
+
+    /**
+     * @return true if there there are still un-executed attribute sources for the {@link PersonBuilder}
+     */
+    protected boolean runPendingSources(
+            PersonBuilder personBuilder,
+            AttributeQuery<Criteria> attributeQuery,
+            Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers,
+            BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkers) {
+        
+        //Short-circuit if there are no more pending sources for this person
+        final Set<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSources = personBuilder.getPendingSources();
+        if (pendingSources.isEmpty()) {
+            return false;
+        }
+        
+        //Generate the critera and attribute query to use for subqueries on this person
+        final Criteria subqueryCriteria = personBuilder.getSubqueryCriteria();
+        final AttributeQuery<Criteria> subAttributeQuery = new AttributeQuery<Criteria>(subqueryCriteria, attributeQuery);
+
+        //Iterate over all sources that have not yet been run for this person
+        for (final Iterator<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSourcesItr = pendingSources.iterator(); pendingSourcesItr.hasNext(); ) {
+            final AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig = pendingSourcesItr.next();
+            
+            //Check if the source can execute this query
+            if (canRun(subAttributeQuery, sourceConfig)) {
+                
+                //Create the source-specific query worker
+                final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
+                if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
+                    final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
+                    queryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, subAttributeQuery, completeWorkers);
+                }
+                else if (sourceConfig instanceof SimpleAttributeSourceConfig) {
+                    final SimpleAttributeSourceConfig simpleAttributeSourceConfig = (SimpleAttributeSourceConfig)sourceConfig;
+                    queryWorker = new SimpleAttributeQueryWorker(this.config, simpleAttributeSourceConfig, subAttributeQuery, completeWorkers);
+                }
+                else {
+                    throw new IllegalArgumentException(sourceConfig.getClass() + " is not a supported AttributeSourceConfig implementation");
+                }
+                
+                //Add to set of tracked workers
+                runningWorkers.add(queryWorker);
+                
+                //Create worker complete callback and submit the worker
+                queryWorker.submit(attributeSourceExecutor);
+                
+                pendingSourcesItr.remove();
+            }
+        }
+        
+        return !pendingSources.isEmpty();
     }
     
     protected String getPrimaryId(PersonAttributes personAttributes) {

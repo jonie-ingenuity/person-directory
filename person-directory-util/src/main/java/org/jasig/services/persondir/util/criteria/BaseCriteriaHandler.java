@@ -16,7 +16,7 @@ public class BaseCriteriaHandler implements CriteriaHandler {
     }
 
     @Override
-    public void handleCompareCriteria(CompareCriteria c, CriteriaWalker walker) {
+    public void handleCompareCriteria(CompareCriteria<?> c, CriteriaWalker walker) {
     }
 
     @Override
@@ -25,9 +25,8 @@ public class BaseCriteriaHandler implements CriteriaHandler {
         walker.walkCriteria(c.getCriteria());
         negated = !negated;
     }
-    
+
     protected final boolean isNegated() {
         return negated;
     }
-
 }

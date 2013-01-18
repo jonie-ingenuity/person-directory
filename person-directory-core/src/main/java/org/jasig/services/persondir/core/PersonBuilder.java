@@ -1,20 +1,24 @@
 package org.jasig.services.persondir.core;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.jasig.services.persondir.Person;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
+import org.jasig.services.persondir.criteria.AndCriteria;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
-import org.jasig.services.persondir.criteria.LogicCriteriaBuilder;
+import org.jasig.services.persondir.criteria.OrCriteria;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.LinkedCaseInsensitiveMap;
 
 /**
  * Builder used to compile attributes from multiple sources
@@ -24,9 +28,9 @@ import org.slf4j.LoggerFactory;
 public class PersonBuilder {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     
-    private final Map<String, List<Object>> attributes = new LinkedHashMap<String, List<Object>>();
+    private final LinkedCaseInsensitiveMap<List<Object>> attributes = new LinkedCaseInsensitiveMap<List<Object>>();
     private final Map<String, AttributeSourceConfig<? extends BaseAttributeSource>> attributeSources = new HashMap<String, AttributeSourceConfig<? extends BaseAttributeSource>>();
-    private final LogicCriteriaBuilder subqueryCriteria = CriteriaBuilder.andBuilder();
+    private final List<Criteria> subqueryCriteria = new LinkedList<Criteria>();
     private final String primaryId;
     private final Set<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSources;
     
@@ -34,6 +38,10 @@ public class PersonBuilder {
         this.primaryId = primaryId;
         this.pendingSources = new HashSet<AttributeSourceConfig<? extends BaseAttributeSource>>(multiPassSources);
         this.subqueryCriteria.add(originalCriteria);
+    }
+    
+    public String getPrimaryId() {
+        return primaryId;
     }
 
     public boolean mergeAttributes(PersonAttributes personAttributes, AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig) {
@@ -55,11 +63,11 @@ public class PersonBuilder {
                     subqueryCriteria.add(CriteriaBuilder.eq(attribute, newValues.get(0)));
                 }
                 else {
-                    final LogicCriteriaBuilder orBuilder = CriteriaBuilder.orBuilder();
+                    final List<Criteria> orBuilder = new ArrayList<Criteria>(newValues.size());
                     for (final Object value : newValues) {
                         orBuilder.add(CriteriaBuilder.eq(attribute, value));
                     }
-                    subqueryCriteria.add(orBuilder.build());
+                    subqueryCriteria.add(new OrCriteria(orBuilder));
                 }
                 
                 //mark that the attributes have changed
@@ -83,6 +91,14 @@ public class PersonBuilder {
     }
 
     public Criteria getSubqueryCriteria() {
-        return subqueryCriteria.build();
+        return new AndCriteria(subqueryCriteria);
+    }
+    
+    public Map<String, List<Object>> getAttributes() {
+        return this.attributes;
+    }
+    
+    public Person build() {
+        return new ImmutablePersonImpl(this.primaryId, this.attributes);
     }
 }

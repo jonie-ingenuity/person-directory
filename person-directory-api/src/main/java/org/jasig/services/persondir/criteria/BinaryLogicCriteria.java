@@ -1,61 +1,38 @@
 package org.jasig.services.persondir.criteria;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
-public class BinaryLogicCriteria implements Criteria {
-    private final List<Criteria> queryList;
-    private final LogicOperation operation;
+import com.google.common.collect.ImmutableList;
 
-    public BinaryLogicCriteria(LogicOperation operation, Criteria... queries) {
-        this.operation = operation;
-        
-        if (queries.length < 1) {
+public abstract class BinaryLogicCriteria implements Criteria {
+    private final List<Criteria> criteriaList;
+
+    public BinaryLogicCriteria(Criteria... criterias) {
+        if (criterias.length < 1) {
             throw new IllegalArgumentException("At least one Criteria must be specified");
         }
 
-        //TODO guava
-        final ArrayList<Criteria> ql = new ArrayList<Criteria>(queries.length);
-        for (final Criteria criteria : queries) {
-            ql.add(criteria);
-        }
-        this.queryList = Collections.unmodifiableList(ql);
+        this.criteriaList = ImmutableList.copyOf(criterias);
     }
     
-    public BinaryLogicCriteria(LogicOperation operation, Collection<Criteria> queries) {
-        this.operation = operation;
-        
-        if (queries.size() < 1) {
+    public BinaryLogicCriteria(Collection<Criteria> criterias) {
+        if (criterias.size() < 1) {
             throw new IllegalArgumentException("At least one Criteria must be specified");
         }
 
-        //TODO guava
-        final ArrayList<Criteria> ql = new ArrayList<Criteria>(queries);
-        this.queryList = Collections.unmodifiableList(ql);
+        this.criteriaList = ImmutableList.copyOf(criterias);
+    }
+    
+    BinaryLogicCriteria(BinaryLogicCriteria criteria) {
+        this.criteriaList = criteria.criteriaList;
     }
 
     public final List<Criteria> getCriteriaList() {
-        return queryList;
-    }
-    
-    public final LogicOperation getOperation() {
-        return operation;
+        return criteriaList;
     }
 
-    public enum LogicOperation {
-        AND {
-            public LogicOperation getNegatedForm() {
-                return OR;
-            }
-        },
-        OR {
-            public LogicOperation getNegatedForm() {
-                return AND;
-            }
-        };
-        
-        public abstract LogicOperation getNegatedForm();
-    }
+    @Override
+    public abstract BinaryLogicCriteria getNegatedForm();
+    
 }

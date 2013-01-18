@@ -2,8 +2,10 @@ package org.jasig.services.persondir.core.worker;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 
 import net.sf.ehcache.Ehcache;
@@ -19,11 +21,6 @@ import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 import org.springframework.util.Assert;
 
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-
 /**
  * Base query worker that encapsulates the lifecycle of executing an attribute query
  * 
@@ -37,15 +34,17 @@ public abstract class AbstractAttributeQueryWorker<
         S extends BaseAttributeSource, 
         C extends AttributeSourceConfig<S>> {
     
-    protected final PersonDirectoryConfig personDirectoryConfig;
-    protected final C sourceConfig;
-    protected final PersonBuilder personBuilder;
-    protected final long timeout;
-    protected final AttributeQuery<Criteria> originalQuery;
-    protected final AttributeQuery<Q> filteredQuery;
+    private final PersonDirectoryConfig personDirectoryConfig;
+    private final C sourceConfig;
+    private final AttributeQuery<Criteria> originalQuery;
+    private final Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue;
+    private final PersonBuilder personBuilder;
+    
+    private long timeout;
+    private AttributeQuery<Q> filteredQuery;
     
     private volatile Serializable cachedCacheKey;
-    private ListenableFuture<List<PersonAttributes>> futureResult;
+    private Future<?> futureResult;
     private volatile List<PersonAttributes> result;
     private volatile Throwable error;
     
@@ -59,24 +58,28 @@ public abstract class AbstractAttributeQueryWorker<
     public AbstractAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
             C sourceConfig,
-            AttributeQuery<Criteria> attributeQuery) {
+            AttributeQuery<Criteria> attributeQuery,
+            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
         
-        this(personDirectoryConfig, sourceConfig, null, attributeQuery);
+        this(personDirectoryConfig, sourceConfig, null, attributeQuery, completedWorkerQueue);
     }
     
     public AbstractAttributeQueryWorker(
             PersonDirectoryConfig personDirectoryConfig,
             C sourceConfig,
             PersonBuilder personBuilder,
-            AttributeQuery<Criteria> attributeQuery) {
+            AttributeQuery<Criteria> attributeQuery,
+            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
         
         Assert.notNull(personDirectoryConfig, "personDirectoryConfig cannot be null");
         Assert.notNull(sourceConfig, "sourceConfig cannot be null");
         Assert.notNull(attributeQuery, "attributeQuery cannot be null");
+        Assert.notNull(completedWorkerQueue, "completedWorkerQueue cannot be null");
         
         this.personDirectoryConfig = personDirectoryConfig;
         this.sourceConfig = sourceConfig;
         this.personBuilder = personBuilder;
+        this.completedWorkerQueue = completedWorkerQueue;
         
         this.originalQuery = attributeQuery;
         final Q query = filterQuery(attributeQuery.getQuery());
@@ -97,7 +100,7 @@ public abstract class AbstractAttributeQueryWorker<
      * 
      * @throws IllegalStateException if {@link #submit(ExecutorService)} has already been called
      */
-    public final void submit(ListeningExecutorService service, final Runnable futureCallback) {
+    public final void submit(ExecutorService service) {
         Assert.notNull(service);
         if (this.futureResult != null) {
             throw new IllegalStateException("Cannot submit worker twice");
@@ -110,9 +113,8 @@ public abstract class AbstractAttributeQueryWorker<
         @SuppressWarnings("unchecked")
         final List<PersonAttributes> result = (List<PersonAttributes>)getCachedValue(resultCache);
         if (result != null) {
-            this.started = this.submitted;
-            this.complete = this.started;
-            this.futureResult = Futures.immediateFuture(result);
+            final CachedAttributeQueryTask callable = new CachedAttributeQueryTask(result);
+            callable.run();
             return;
         }
         
@@ -121,9 +123,8 @@ public abstract class AbstractAttributeQueryWorker<
         @SuppressWarnings("unchecked")
         final List<PersonAttributes> miss = (List<PersonAttributes>)getCachedValue(missCache);
         if (miss != null) {
-            this.started = this.submitted;
-            this.complete = this.started;
-            this.futureResult = Futures.immediateFuture(miss);
+            final CachedAttributeQueryTask callable = new CachedAttributeQueryTask(miss);
+            callable.run();
             return;
         }
         
@@ -131,33 +132,18 @@ public abstract class AbstractAttributeQueryWorker<
         final Ehcache errorCache = sourceConfig.getErrorCache();
         final Throwable error = (Throwable)getCachedValue(errorCache);
         if (error != null) {
-            this.started = this.submitted;
-            this.complete = this.started;
-            this.futureResult = Futures.immediateFailedFuture(error);
+            final CachedAttributeQueryTask callable = new CachedAttributeQueryTask(error);
+            callable.run();
             return;
         }
         
         //Nothing in the caches, submit the worker
-        final AttributeQueryCallable task = createQueryCallable(this.filteredQuery);
+        final AttributeQueryTask task = createQueryCallable(this.filteredQuery);
         this.futureResult = service.submit(task);
-        
-        //Add on-completion callbacks
-        Futures.addCallback(this.futureResult, new FutureCallback<List<PersonAttributes>>() {
-            @Override
-            public void onSuccess(List<PersonAttributes> result) {
-                setResult(result);
-                futureCallback.run();
-            }
-
-            @Override
-            public void onFailure(Throwable t) {
-                setError(t);
-                futureCallback.run();
-            }
-        });
     }
-    
-    private final void setResult(List<PersonAttributes> result) {
+
+
+    private void setResult(List<PersonAttributes> result) {
         this.result = result;
         
         //Empty result, cache it as a miss
@@ -178,7 +164,7 @@ public abstract class AbstractAttributeQueryWorker<
         }
     }
     
-    private final void setError(Throwable t) {
+    private void setError(Throwable t) {
         this.error = t;
         
         final Ehcache errorCache = this.sourceConfig.getErrorCache();
@@ -284,15 +270,12 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * Utility to rethrow a genertic Throwable with minimal wrapping
      */
-    protected final void rethrowUnchecked(Throwable t) throws TimeoutException {
+    protected final void rethrowUnchecked(Throwable t) {
         if (t instanceof RuntimeException) {
             throw (RuntimeException)t;
         }
         if (t instanceof Error) {
             throw (Error)t;
-        }
-        if (t instanceof TimeoutException) {
-            throw (TimeoutException)t;
         }
         throw new RuntimeException(t);
     }
@@ -334,7 +317,7 @@ public abstract class AbstractAttributeQueryWorker<
      * Create the {@link Callable} that does the actual query work, only called if no
      * cached result exists
      */
-    protected abstract AttributeQueryCallable createQueryCallable(AttributeQuery<Q> filteredQuery);
+    protected abstract AttributeQueryTask createQueryCallable(AttributeQuery<Q> filteredQuery);
     
     /**
      * Generate the cache key for the query, only called if caches are configured
@@ -349,15 +332,20 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * Base {@link Callable} that does the query work, tracks start/stop time for the query
      */
-    protected abstract class AttributeQueryCallable implements Callable<List<PersonAttributes>> {
+    protected abstract class AttributeQueryTask implements Runnable {
         @Override
-        public final List<PersonAttributes> call() throws Exception {
+        public final void run() {
             started = System.currentTimeMillis();
             try {
-                return doQuery();
+                final List<PersonAttributes> result = doQuery();
+                setResult(result);
+            }
+            catch (Throwable t) {
+                setError(t);
             }
             finally {
                 complete = System.currentTimeMillis();
+                completedWorkerQueue.offer(AbstractAttributeQueryWorker.this);
             }
         }
         
@@ -365,5 +353,27 @@ public abstract class AbstractAttributeQueryWorker<
          * @return Execute the query and return the value
          */
         protected abstract List<PersonAttributes> doQuery();
+    }
+    
+    private class CachedAttributeQueryTask extends AttributeQueryTask {
+        private final List<PersonAttributes> result;
+        private final Throwable error;
+        
+        public CachedAttributeQueryTask(Throwable error) {
+            this.result = null;
+            this.error = error;
+        }
+        public CachedAttributeQueryTask(List<PersonAttributes> result) {
+            this.result = result;
+            this.error = null;
+        }
+
+        @Override
+        protected List<PersonAttributes> doQuery() {
+            if (this.error != null) {
+                rethrowUnchecked(error);
+            }
+            return this.result;
+        }
     }
 }

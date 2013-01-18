@@ -4,12 +4,19 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.jasig.services.persondir.criteria.AndCriteria;
 import org.jasig.services.persondir.criteria.BinaryLogicCriteria;
 import org.jasig.services.persondir.criteria.CompareCriteria;
 import org.jasig.services.persondir.criteria.Criteria;
+import org.jasig.services.persondir.criteria.EqualsCriteria;
+import org.jasig.services.persondir.criteria.GreaterThanCriteria;
+import org.jasig.services.persondir.criteria.GreaterThanOrEqualsCriteria;
 import org.jasig.services.persondir.criteria.IllegalCriteriaException;
+import org.jasig.services.persondir.criteria.LessThanCriteria;
+import org.jasig.services.persondir.criteria.LessThanOrEqualsCriteria;
+import org.jasig.services.persondir.criteria.LikeCriteria;
 import org.jasig.services.persondir.criteria.NotCriteria;
-import org.jasig.services.persondir.criteria.CompareCriteria.CompareOperation;
+import org.jasig.services.persondir.criteria.OrCriteria;
 import org.jasig.services.persondir.util.criteria.CriteriaHandler;
 import org.jasig.services.persondir.util.criteria.CriteriaWalker;
 
@@ -38,10 +45,10 @@ final class SqlCriteriaBuilder implements CriteriaHandler {
             if (logicCriteriaItr.hasNext()) {
                 sb.append(" ");
                 if (negated) {
-                    sb.append(blc.getOperation());
+                    sb.append(getComparisonOperator(blc));
                 }
                 else {
-                    sb.append(blc.getOperation().getNegatedForm());
+                    sb.append(getComparisonOperator(blc.getNegatedForm()));
                 }
                 sb.append(" ");
             }
@@ -51,28 +58,19 @@ final class SqlCriteriaBuilder implements CriteriaHandler {
     }
 
     @Override
-    public void handleCompareCriteria(CompareCriteria cc, CriteriaWalker walker) {
+    public void handleCompareCriteria(CompareCriteria<?> cc, CriteriaWalker walker) {
         final String attribute = cc.getAttribute();
         final Object value = cc.getValue();
 
         sb.append(" ").append(attribute);
-
-        //Determine the comparison operator
-        final CompareOperation operation;
-        if (negated) {
-            operation = cc.getOperation().getNegatedForm();
-        }
-        else {
-            operation = cc.getOperation();
-        }
         
         //Append the operator and for non-null parameters add to the parameter map
         if (value != null) {
-            appendOperator(operation, sb);
+            appendOperator(cc, sb);
             params.add(value);
         }
         else {
-            appendNullOperator(operation, sb);
+            appendNullOperator(cc, sb);
         }
     }
 
@@ -83,60 +81,84 @@ final class SqlCriteriaBuilder implements CriteriaHandler {
         walker.walkCriteria(c.getCriteria());
         negated = original;
     }
+    
+    protected String getComparisonOperator(BinaryLogicCriteria criteria) {
+        if (criteria instanceof AndCriteria) {
+            return "AND";
+        }
+        else if (criteria instanceof OrCriteria) {
+            return "OR";
+        }
+        else {
+            throw new IllegalCriteriaException("Unsupported CompareOperation: " + criteria.getClass().getName());
+        }
+    }
 
-    protected void appendOperator(CompareOperation operation, StringBuilder sb) {
-        switch (operation) {
-            case EQUALS: {
-                sb.append(" = ?");                    
-                break;
-            }
-            case NOT_EQUALS: {
+    protected void appendOperator(CompareCriteria<?> criteria, StringBuilder sb) {
+        if (criteria instanceof EqualsCriteria) {
+            if (negated) {
                 sb.append(" <> ?");
-                break;
             }
-            case LIKE: {
-                sb.append(" LIKE ?");
-                break;
+            else {
+                sb.append(" = ?");
             }
-            case NOT_LIKE: {
+        }
+        else if (criteria instanceof LikeCriteria) {
+            if (negated) {
                 sb.append(" NOT LIKE ?");
-                break;
             }
-            case GREATER_THAN: {
-                sb.append(" > ?");
-                break;
+            else {
+                sb.append(" LIKE ?");
             }
-            case GREATER_THAN_OR_EQUALS: {
-                sb.append(" >= ?");
-                break;
-            }
-            case LESS_THAN: {
-                sb.append(" < ?");
-                break;
-            }
-            case LESS_THAN_OR_EQUALS: {
+        }
+        else if (criteria instanceof GreaterThanCriteria) {
+            if (negated) {
                 sb.append(" <= ?");
-                break;
             }
-            default: {
-                throw new IllegalCriteriaException("Unsupported CompareOperation: " + operation);
+            else {
+                sb.append(" > ?");
             }
+        }
+        else if (criteria instanceof GreaterThanOrEqualsCriteria) {
+            if (negated) {
+                sb.append(" < ?");
+            }
+            else {
+                sb.append(" >= ?");
+            }
+        }
+        else if (criteria instanceof LessThanCriteria) {
+            if (negated) {
+                sb.append(" >= ?");
+            }
+            else {
+                sb.append(" < ?");
+            }
+        }
+        else if (criteria instanceof LessThanOrEqualsCriteria) {
+            if (negated) {
+                sb.append(" > ?");
+            }
+            else {
+                sb.append(" <= ?");
+            }
+        }
+        else {
+            throw new IllegalCriteriaException("Unsupported CompareOperation: " + criteria.getClass().getName());
         }
     }
     
-    protected void appendNullOperator(CompareOperation operation, StringBuilder sb) {
-        switch (operation) {
-            case EQUALS: {
-                sb.append(" IS NULL");                    
-                break;
-            }
-            case NOT_EQUALS: {
+    protected void appendNullOperator(CompareCriteria<?> criteria, StringBuilder sb) {
+        if (criteria instanceof EqualsCriteria) {
+            if (negated) {
                 sb.append(" IS NOT NULL");
-                break;
             }
-            default: {
-                throw new IllegalCriteriaException("Cannot use " + operation + " with a null value");
+            else {
+                sb.append(" IS NULL");
             }
+        }
+        else {
+            throw new IllegalCriteriaException("Cannot use " + criteria.getClass().getName() + " with a null value");
         }
     }
 }
