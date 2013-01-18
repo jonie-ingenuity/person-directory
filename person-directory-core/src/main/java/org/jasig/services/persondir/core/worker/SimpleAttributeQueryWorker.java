@@ -27,7 +27,7 @@ public class SimpleAttributeQueryWorker
             PersonDirectoryConfig personDirectoryConfig,
             SimpleAttributeSourceConfig sourceConfig,
             AttributeQuery<Criteria> attributeQuery,
-            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
+            Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
         super(personDirectoryConfig, sourceConfig, attributeQuery, completedWorkerQueue);
     }
@@ -37,7 +37,7 @@ public class SimpleAttributeQueryWorker
             SimpleAttributeSourceConfig sourceConfig,
             PersonBuilder personBuilder,
             AttributeQuery<Criteria> attributeQuery,
-            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
+            Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
         super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery, completedWorkerQueue);
     }

@@ -32,12 +32,12 @@ import org.springframework.util.Assert;
 public abstract class AbstractAttributeQueryWorker<
         Q,
         S extends BaseAttributeSource, 
-        C extends AttributeSourceConfig<S>> {
+        C extends AttributeSourceConfig<S>> implements AttributeQueryWorker<Q, C> {
     
     private final PersonDirectoryConfig personDirectoryConfig;
     private final C sourceConfig;
     private final AttributeQuery<Criteria> originalQuery;
-    private final Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue;
+    private final Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue;
     private final PersonBuilder personBuilder;
     
     private long timeout;
@@ -59,7 +59,7 @@ public abstract class AbstractAttributeQueryWorker<
             PersonDirectoryConfig personDirectoryConfig,
             C sourceConfig,
             AttributeQuery<Criteria> attributeQuery,
-            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
+            Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
         
         this(personDirectoryConfig, sourceConfig, null, attributeQuery, completedWorkerQueue);
     }
@@ -69,7 +69,7 @@ public abstract class AbstractAttributeQueryWorker<
             C sourceConfig,
             PersonBuilder personBuilder,
             AttributeQuery<Criteria> attributeQuery,
-            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
+            Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
         
         Assert.notNull(personDirectoryConfig, "personDirectoryConfig cannot be null");
         Assert.notNull(sourceConfig, "sourceConfig cannot be null");
@@ -100,6 +100,7 @@ public abstract class AbstractAttributeQueryWorker<
      * 
      * @throws IllegalStateException if {@link #submit(ExecutorService)} has already been called
      */
+    @Override
     public final void submit(ExecutorService service) {
         Assert.notNull(service);
         if (this.futureResult != null) {
@@ -180,6 +181,7 @@ public abstract class AbstractAttributeQueryWorker<
      * @throws InterruptedException if interrupted while waiting for the result
      * @throws IllegalStateException if {@link #submit(ExecutorService)} has not been called yet
      */
+    @Override
     public final List<PersonAttributes> getResult() throws InterruptedException, TimeoutException {
         if (this.futureResult == null) {
             throw new IllegalStateException("submit must be called before getResult");
@@ -201,6 +203,7 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The number of milliseconds to wait for the result from this worker
      */
+    @Override
     public final long getCurrentWaitTime() {
         return Math.max(1, this.timeout - (System.currentTimeMillis() - this.started));
     }
@@ -208,6 +211,7 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The filtered query used by the worker
      */
+    @Override
     public final AttributeQuery<Q> getFilteredQuery() {
         return this.filteredQuery;
     }
@@ -215,6 +219,7 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The original query passed to the worker
      */
+    @Override
     public final AttributeQuery<Criteria> getOriginalQuery() {
         return originalQuery;
     }
@@ -222,6 +227,7 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The time submitted, -1 if not yet submitted
      */
+    @Override
     public final long getSubmitted() {
         return submitted;
     }
@@ -229,6 +235,7 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The time the query executed started, -1 if not yet started
      */
+    @Override
     public final long getStarted() {
         return started;
     }
@@ -236,26 +243,32 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The time the query completed, -1 if not yet completed
      */
+    @Override
     public final long getComplete() {
         return complete;
     }
     
+    @Override
     public final PersonBuilder getPersonBuilder() {
         return personBuilder;
     }
 
+    @Override
     public final boolean isComplete() {
         return complete != -1;
     }
     
+    @Override
     public final boolean cancelFuture(boolean mayInterruptIfRunning) {
         return futureResult.cancel(mayInterruptIfRunning);
     }
 
+    @Override
     public final boolean isFutureCancelled() {
         return futureResult.isCancelled();
     }
 
+    @Override
     public final boolean isFutureDone() {
         return futureResult.isDone();
     }
@@ -263,6 +276,7 @@ public abstract class AbstractAttributeQueryWorker<
     /**
      * @return The underlying attribute source configuration for this worker
      */
+    @Override
     public final C getSourceConfig() {
         return sourceConfig;
     }

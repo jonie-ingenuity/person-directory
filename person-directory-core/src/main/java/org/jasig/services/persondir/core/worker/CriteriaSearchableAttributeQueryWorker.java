@@ -25,7 +25,7 @@ public class CriteriaSearchableAttributeQueryWorker
             PersonDirectoryConfig personDirectoryConfig,
             CriteriaSearchableAttributeSourceConfig sourceConfig,
             AttributeQuery<Criteria> attributeQuery,
-            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
+            Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
         super(personDirectoryConfig, sourceConfig, attributeQuery, completedWorkerQueue);
     }
@@ -36,7 +36,7 @@ public class CriteriaSearchableAttributeQueryWorker
             CriteriaSearchableAttributeSourceConfig sourceConfig,
             PersonBuilder personBuilder,
             AttributeQuery<Criteria> attributeQuery,
-            Queue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
+            Queue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completedWorkerQueue) {
 
         super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery, completedWorkerQueue);
     }

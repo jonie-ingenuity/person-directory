@@ -24,7 +24,7 @@ import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.CriteriaSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
-import org.jasig.services.persondir.core.worker.AbstractAttributeQueryWorker;
+import org.jasig.services.persondir.core.worker.AttributeQueryWorker;
 import org.jasig.services.persondir.core.worker.CriteriaSearchableAttributeQueryWorker;
 import org.jasig.services.persondir.core.worker.SimpleAttributeQueryWorker;
 import org.jasig.services.persondir.criteria.Criteria;
@@ -104,12 +104,12 @@ public final class PersonDirectoryImpl implements PersonDirectory {
          */
         
         //Set of workers that have been submitted for execution
-        final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
-            runningWorkers = new HashSet<AbstractAttributeQueryWorker<?,? extends BaseAttributeSource,? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+        final Set<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+            runningWorkers = new HashSet<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
         //Queue where workers are placed when they finish execution
-        final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
-            completeWorkers = new LinkedBlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
+        final BlockingQueue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
+            completeWorkers = new LinkedBlockingQueue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>>();
         
         //Set of sources to be run in passes 2..N
         //First Pass: runs the Criteria against any DAO that it matches against
@@ -143,7 +143,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             long maxWaitTime = getMaxWaitTime(runningWorkers);
             
             //Wait for a result to appear in the completeWorker Queue
-            AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker = null;
+            AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker = null;
             try {
                 completeWorker = completeWorkers.poll(maxWaitTime, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
@@ -156,7 +156,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             if (completeWorker == null) {
                 // uhoh everything in-progress took longer than it should have and we can't have any new results at this point
                 // Cancel all in-progress workers and break out of the loop
-                for (final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers) {
+                for (final AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers) {
                     queryWorker.cancelFuture(true);
                     break;
                 }
@@ -202,7 +202,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
      * @return true if the handling of the completed worker modified the overal result set 
      */
     protected boolean handleCompleteWorker(
-            AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker,
+            AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker,
             Map<String, PersonBuilder> personBuilders,
             Set<AttributeSourceConfig<? extends BaseAttributeSource>> multiPassSources) {
         
@@ -258,8 +258,8 @@ public final class PersonDirectoryImpl implements PersonDirectory {
      */
     protected Set<AttributeSourceConfig<? extends BaseAttributeSource>> runFirstPassSources(
             AttributeQuery<Criteria> attributeQuery,
-            final Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers,
-            final BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkers) {
+            final Set<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers,
+            final BlockingQueue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkers) {
         
         final Set<AttributeSourceConfig<? extends BaseAttributeSource>> 
             multiPassSources = new HashSet<AttributeSourceConfig<? extends BaseAttributeSource>>();
@@ -287,9 +287,9 @@ public final class PersonDirectoryImpl implements PersonDirectory {
     /**
      * @return The maximum time to wait from "now" for all workers currently in the runningWorkers set to reach their maximum execution time
      */
-    protected long getMaxWaitTime(Set<AbstractAttributeQueryWorker<?, ?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers) {
+    protected long getMaxWaitTime(Set<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers) {
         long maxWaitTime = 0;
-        for (final AbstractAttributeQueryWorker<?, ?, ?> queryWorker : runningWorkers) {
+        for (final AttributeQueryWorker<?, ?> queryWorker : runningWorkers) {
             maxWaitTime = Math.max(maxWaitTime, queryWorker.getCurrentWaitTime());
         }
         return maxWaitTime;
@@ -301,8 +301,8 @@ public final class PersonDirectoryImpl implements PersonDirectory {
     protected boolean runPendingSources(
             PersonBuilder personBuilder,
             AttributeQuery<Criteria> attributeQuery,
-            Set<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers,
-            BlockingQueue<AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkers) {
+            Set<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> runningWorkers,
+            BlockingQueue<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> completeWorkers) {
         
         //Short-circuit if there are no more pending sources for this person
         final Set<AttributeSourceConfig<? extends BaseAttributeSource>> pendingSources = personBuilder.getPendingSources();
@@ -322,7 +322,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             if (canRun(subAttributeQuery, sourceConfig)) {
                 
                 //Create the source-specific query worker
-                final AbstractAttributeQueryWorker<?, ? extends BaseAttributeSource, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
+                final AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker;
                 if (sourceConfig instanceof CriteriaSearchableAttributeSourceConfig) {
                     final CriteriaSearchableAttributeSourceConfig criteriaSearchableSourceConfig = (CriteriaSearchableAttributeSourceConfig)sourceConfig;
                     queryWorker = new CriteriaSearchableAttributeQueryWorker(this.config, criteriaSearchableSourceConfig, subAttributeQuery, completeWorkers);
