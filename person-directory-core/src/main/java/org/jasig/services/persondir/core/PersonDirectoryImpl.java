@@ -1,5 +1,6 @@
 package org.jasig.services.persondir.core;
 
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -11,6 +12,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+
+import net.sf.ehcache.Ehcache;
+import net.sf.ehcache.Element;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.Person;
@@ -26,6 +30,7 @@ import org.jasig.services.persondir.core.worker.SimpleAttributeQueryWorker;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
+import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
 import org.jasig.services.persondir.util.criteria.AttributeNamesCriteriaProcessor;
 import org.slf4j.Logger;
@@ -81,9 +86,21 @@ public final class PersonDirectoryImpl implements PersonDirectory {
 
     @Override
     public List<Person> searchForPeople(AttributeQuery<Criteria> attributeQuery) {
+        
+        Serializable mergeCacheKey = null;
+        final Ehcache mergeCache = config.getMergeCache();
+        if (mergeCache != null) {
+            final CacheKeyGenerator cacheKeyGenerator = config.getCacheKeyGenerator();
+            mergeCacheKey = cacheKeyGenerator.generateCriteriaCacheKey(attributeQuery);
+            
+            final Element mergeElement = mergeCache.get(mergeCacheKey);
+            if (mergeElement != null) {
+                return (List<Person>)mergeElement.getObjectValue();
+            }
+        }
+        
         /*
          * TODO attribute transformation API (includes mapping)
-         * TODO merge cache
          */
         
         //Set of workers that have been submitted for execution
@@ -162,17 +179,23 @@ public final class PersonDirectoryImpl implements PersonDirectory {
         
         final Criteria originalCriteria = attributeQuery.getQuery();
         
-        final ImmutableList.Builder<Person> results = ImmutableList.builder();
+        //Generate the List<Person> from the builders, filtering each basedon the original filter
+        final ImmutableList.Builder<Person> resultsBuilder = ImmutableList.builder();
         for (final PersonBuilder personBuilder : personBuilders.values()) {
             final Map<String, List<Object>> attributes = personBuilder.getAttributes();
             if (originalCriteria.matches(attributes)) {
                 //Only include results that match the original filter
-                results.add(personBuilder.build());
+                resultsBuilder.add(personBuilder.build());
             }
         }
         
-        //TODO cache this in the mergeCache
-        return results.build();
+        //Cache the result if the merge cache is enabled
+        final ImmutableList<Person> results = resultsBuilder.build();
+        if (mergeCache != null) {
+            mergeCache.put(new Element(mergeCacheKey, results));
+        }
+        
+        return results;
     }
 
     /**
