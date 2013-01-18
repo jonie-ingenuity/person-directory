@@ -29,4 +29,9 @@ public class LikeCriteria extends CompareCriteria<String> {
         
         return false;
     }
+    
+    @Override
+    public void process(CriteriaProcessor builder) {
+        builder.appendLike(this.getAttribute(), this.getValue());
+    }
 }

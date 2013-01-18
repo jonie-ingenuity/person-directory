@@ -23,4 +23,11 @@ public class NotCriteria implements Criteria {
     public Criteria getNegatedForm() {
         return this.criteria;
     }
+    
+    @Override
+    public void process(CriteriaProcessor builder) {
+        builder.appendNotStart();
+        this.criteria.process(builder);
+        builder.appendNotEnd();
+    }
 }

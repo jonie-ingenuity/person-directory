@@ -27,8 +27,7 @@ import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
-import org.jasig.services.persondir.util.criteria.CriteriaAttributeNamesHandler;
-import org.jasig.services.persondir.util.criteria.CriteriaWalker;
+import org.jasig.services.persondir.util.criteria.AttributeNamesCriteriaProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -346,8 +345,8 @@ public final class PersonDirectoryImpl implements PersonDirectory {
     protected boolean canRun(AttributeQuery<Criteria> attributeQuery, AttributeSourceConfig<? extends BaseAttributeSource> sourceConfig) {
         //Capture attribute names from the criteria
         final Criteria criteria = attributeQuery.getQuery();
-        final CriteriaAttributeNamesHandler criteriaAttributeNamesHandler = new CriteriaAttributeNamesHandler();
-        CriteriaWalker.walkCriteria(criteria, criteriaAttributeNamesHandler);
+        final AttributeNamesCriteriaProcessor criteriaAttributeNamesHandler = new AttributeNamesCriteriaProcessor();
+        criteria.process(criteriaAttributeNamesHandler);
         final Set<String> queryAttributeNames = criteriaAttributeNamesHandler.getAttributeNames();
         
         final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();

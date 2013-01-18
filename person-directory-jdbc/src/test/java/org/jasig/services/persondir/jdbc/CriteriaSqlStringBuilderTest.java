@@ -6,7 +6,6 @@ import java.util.List;
 
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
-import org.jasig.services.persondir.util.criteria.CriteriaWalker;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -14,7 +13,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import com.google.common.collect.ImmutableList;
 
 @RunWith(MockitoJUnitRunner.class)
-public class SqlCriteriaBuilderTest {
+public class CriteriaSqlStringBuilderTest {
     
     @Test
     public void testCriteriaToSql() {
@@ -26,13 +25,13 @@ public class SqlCriteriaBuilderTest {
             )
         );
 
-        final SqlCriteriaBuilder sqlCriteriaBuilder = new SqlCriteriaBuilder();
-        CriteriaWalker.walkCriteria(c, sqlCriteriaBuilder);
+        final CriteriaSqlStringBuilder builder = new CriteriaSqlStringBuilder();
+        c.process(builder);
+        final List<Object> params = builder.getParams();
+        final String sql = builder.toString();
         
-        final List<Object> params = sqlCriteriaBuilder.getParams();
-        final String sql = sqlCriteriaBuilder.getSql();
         
-        assertEquals("( firstName = ? OR ( lastName = ? AND  lastName = ?))", sql);
+        assertEquals("(firstName = ? AND (lastName = ? OR lastName = ?))", sql);
         assertEquals(ImmutableList.of("jane", "doe", "smith"), params);
     }
     
@@ -48,13 +47,12 @@ public class SqlCriteriaBuilderTest {
             )
         );
 
-        final SqlCriteriaBuilder sqlCriteriaBuilder = new SqlCriteriaBuilder();
-        CriteriaWalker.walkCriteria(c, sqlCriteriaBuilder);
+        final CriteriaSqlStringBuilder builder = new CriteriaSqlStringBuilder();
+        c.process(builder);
+        final List<Object> params = builder.getParams();
+        final String sql = builder.toString();
         
-        final List<Object> params = sqlCriteriaBuilder.getParams();
-        final String sql = sqlCriteriaBuilder.getSql();
-        
-        assertEquals("( firstName = ? OR ( lastName <> ? OR  lastName <> ?))", sql);
+        assertEquals("(firstName = ? AND (lastName <> ? AND lastName <> ?))", sql);
         assertEquals(ImmutableList.of("jane", "doe", "smith"), params);
     }
     
@@ -92,36 +90,35 @@ public class SqlCriteriaBuilderTest {
             )
         );
 
-        final SqlCriteriaBuilder sqlCriteriaBuilder = new SqlCriteriaBuilder();
-        CriteriaWalker.walkCriteria(c, sqlCriteriaBuilder);
-        
-        final List<Object> params = sqlCriteriaBuilder.getParams();
-        final String sql = sqlCriteriaBuilder.getSql();
+        final CriteriaSqlStringBuilder builder = new CriteriaSqlStringBuilder();
+        c.process(builder);
+        final List<Object> params = builder.getParams();
+        final String sql = builder.toString();
         
         assertEquals(
             "(" +
-        		"( " +
-        		    "phone IS NULL OR  " +
-        		    "firstName = ? OR  " +
-        		    "age > ? OR  " +
-        		    "weight >= ? OR  " +
-        		    "height < ? OR  " +
-        		    "length <= ? OR  " +
-        		    "lastName LIKE ?" +
-    		    ") AND " +
-    		    "( " +
-    		        "phone IS NOT NULL AND  " +
-    		        "firstName <> ? AND  " +
-    		        "age <= ? AND  " +
-    		        "weight < ? AND  " +
-    		        "height >= ? AND  " +
-    		        "length > ? AND  " +
-    		        "lastName NOT LIKE ?" +
-		        ") AND " +
-		        "( " +
-		            "phone IS NOT NULL AND  " +
-		            "firstName = ?" +
-	            ")" +
+                "(" +
+                    "phone IS NULL AND " +
+                    "firstName = ? AND " +
+                    "age > ? AND " +
+                    "weight >= ? AND " +
+                    "height < ? AND " +
+                    "length <= ? AND " +
+                    "lastName LIKE ?" +
+                ") OR " +
+                "(" +
+                    "phone IS NOT NULL OR " +
+                    "firstName <> ? OR " +
+                    "age <= ? OR " +
+                    "weight < ? OR " +
+                    "height >= ? OR " +
+                    "length > ? OR " +
+                    "lastName NOT LIKE ?" +
+                ") OR " +
+                "(" +
+                    "phone IS NOT NULL OR " +
+                    "firstName = ?" +
+                ")" +
             ")", sql);
 
         assertEquals(ImmutableList.<Object>of("jane", 13, 14, 15, 16, "Dalq%", "jane", 13, 14, 15, 16, "Dalq%", "jane"), params);

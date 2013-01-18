@@ -7,4 +7,6 @@ public interface Criteria {
     boolean equals(Map<String, List<Object>> attributes);
     
     Criteria getNegatedForm();
+    
+    void process(CriteriaProcessor builder);
 }

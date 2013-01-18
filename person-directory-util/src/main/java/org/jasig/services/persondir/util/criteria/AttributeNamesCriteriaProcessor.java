@@ -3,9 +3,7 @@ package org.jasig.services.persondir.util.criteria;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.jasig.services.persondir.criteria.CompareCriteria;
-
-public class CriteriaAttributeNamesHandler extends BaseCriteriaHandler {
+public class AttributeNamesCriteriaProcessor extends BaseCriteriaProcessor {
     private final Set<String> attributeNames = new HashSet<String>();
 
     public Set<String> getAttributeNames() {
@@ -13,7 +11,7 @@ public class CriteriaAttributeNamesHandler extends BaseCriteriaHandler {
     }
 
     @Override
-    public void handleCompareCriteria(CompareCriteria c, CriteriaWalker walker) {
-        attributeNames.add(c.getAttribute());
+    public void appendCompare(String name, Object value) {
+        attributeNames.add(name);
     }
 }

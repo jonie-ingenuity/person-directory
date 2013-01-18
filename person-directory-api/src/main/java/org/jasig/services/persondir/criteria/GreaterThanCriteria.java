@@ -11,4 +11,9 @@ public class GreaterThanCriteria extends ComparableCriteria {
     protected boolean compare(Comparable<Object> compareValue, Comparable<Object> attributeValue) {
         return compareValue.compareTo(attributeValue) > 0;
     }
+    
+    @Override
+    public void process(CriteriaProcessor builder) {
+        builder.appendGreaterThan(this.getAttribute(), this.getValue());
+    }
 }

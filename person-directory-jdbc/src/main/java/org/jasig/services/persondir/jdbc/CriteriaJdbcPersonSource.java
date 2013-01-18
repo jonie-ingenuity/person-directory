@@ -12,7 +12,6 @@ import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;
-import org.jasig.services.persondir.util.criteria.CriteriaWalker;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
@@ -62,11 +61,11 @@ public class CriteriaJdbcPersonSource implements CriteriaSearchableAttributeSour
     public List<PersonAttributes> searchForAttributes(AttributeQuery<Criteria> query) {
         final Criteria criteria = query.getQuery();
         
-        final SqlCriteriaBuilder handler = new SqlCriteriaBuilder();
-        CriteriaWalker.walkCriteria(criteria, handler);
+        final CriteriaSqlStringBuilder criteriaStringBuilder = new CriteriaSqlStringBuilder();
+        criteria.process(criteriaStringBuilder);
         
-        final String sqlCriteria = handler.getSql();
-        final List<Object> params = handler.getParams();
+        final String sqlCriteria = criteriaStringBuilder.toString();
+        final List<Object> params = criteriaStringBuilder.getParams();
         
         final Matcher queryTemplateMatcher = criteriaPlaceholderPattern.matcher(this.queryTemplate);
         final String sql = queryTemplateMatcher.replaceAll(sqlCriteria);
