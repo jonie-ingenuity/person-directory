@@ -13,7 +13,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import com.google.common.collect.ImmutableList;
 
 @RunWith(MockitoJUnitRunner.class)
-public class CriteriaSqlStringBuilderTest {
+public class SqlStringCriteriaProcessorTest {
     
     @Test
     public void testCriteriaToSql() {
@@ -25,7 +25,7 @@ public class CriteriaSqlStringBuilderTest {
             )
         );
 
-        final CriteriaSqlStringBuilder builder = new CriteriaSqlStringBuilder();
+        final SqlStringCriteriaProcessor builder = new SqlStringCriteriaProcessor();
         c.process(builder);
         final List<Object> params = builder.getParams();
         final String sql = builder.toString();
@@ -47,7 +47,7 @@ public class CriteriaSqlStringBuilderTest {
             )
         );
 
-        final CriteriaSqlStringBuilder builder = new CriteriaSqlStringBuilder();
+        final SqlStringCriteriaProcessor builder = new SqlStringCriteriaProcessor();
         c.process(builder);
         final List<Object> params = builder.getParams();
         final String sql = builder.toString();
@@ -67,7 +67,7 @@ public class CriteriaSqlStringBuilderTest {
                 CriteriaBuilder.gte("weight", 14),
                 CriteriaBuilder.lt("height", 15),
                 CriteriaBuilder.lte("length", 16),
-                CriteriaBuilder.like("lastName", "Dalq%")
+                CriteriaBuilder.like("lastName", "Dalq*")
             ),
             CriteriaBuilder.not(
                 CriteriaBuilder.and(
@@ -90,7 +90,7 @@ public class CriteriaSqlStringBuilderTest {
             )
         );
 
-        final CriteriaSqlStringBuilder builder = new CriteriaSqlStringBuilder();
+        final SqlStringCriteriaProcessor builder = new SqlStringCriteriaProcessor();
         c.process(builder);
         final List<Object> params = builder.getParams();
         final String sql = builder.toString();
@@ -121,6 +121,6 @@ public class CriteriaSqlStringBuilderTest {
                 ")" +
             ")", sql);
 
-        assertEquals(ImmutableList.<Object>of("jane", 13, 14, 15, 16, "Dalq%", "jane", 13, 14, 15, 16, "Dalq%", "jane"), params);
+        assertEquals(ImmutableList.<Object>of("jane", 13, 14, 15, 16, "Dalq*", "jane", 13, 14, 15, 16, "Dalq%", "jane"), params);
     }
 }

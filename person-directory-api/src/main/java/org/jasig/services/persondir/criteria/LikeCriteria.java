@@ -15,7 +15,7 @@ public class LikeCriteria extends CompareCriteria<String> {
     }
 
     @Override
-    public boolean equals(Map<String, List<Object>> attributes) {
+    public boolean matches(Map<String, List<Object>> attributes) {
         final String compareValue = this.getValue();
         final Pattern comparePattern = Pattern.compile(WILDCARD.matcher(compareValue).replaceAll(".*"));
         

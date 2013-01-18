@@ -20,9 +20,9 @@ public class OrCriteria extends BinaryLogicCriteria {
     }
 
     @Override
-    public boolean equals(Map<String, List<Object>> attributes) {
+    public boolean matches(Map<String, List<Object>> attributes) {
         for (final Criteria criteria : this.getCriteriaList()) {
-            if (criteria.equals(attributes)) {
+            if (criteria.matches(attributes)) {
                 return true;
             }
         }

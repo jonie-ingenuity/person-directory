@@ -165,7 +165,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
         final ImmutableList.Builder<Person> results = ImmutableList.builder();
         for (final PersonBuilder personBuilder : personBuilders.values()) {
             final Map<String, List<Object>> attributes = personBuilder.getAttributes();
-            if (originalCriteria.equals(attributes)) {
+            if (originalCriteria.matches(attributes)) {
                 //Only include results that match the original filter
                 results.add(personBuilder.build());
             }

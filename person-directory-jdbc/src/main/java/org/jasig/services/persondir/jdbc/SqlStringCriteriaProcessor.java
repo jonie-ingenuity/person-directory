@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.jasig.services.persondir.criteria.CriteriaProcessor;
 
-public class CriteriaSqlStringBuilder implements CriteriaProcessor {
+public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     private final StringBuilder sb = new StringBuilder();
     private final List<Object> params = new ArrayList<Object>();
     private boolean negated = false;

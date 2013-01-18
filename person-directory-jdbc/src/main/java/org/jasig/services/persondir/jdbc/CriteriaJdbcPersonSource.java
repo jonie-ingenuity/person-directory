@@ -61,7 +61,7 @@ public class CriteriaJdbcPersonSource implements CriteriaSearchableAttributeSour
     public List<PersonAttributes> searchForAttributes(AttributeQuery<Criteria> query) {
         final Criteria criteria = query.getQuery();
         
-        final CriteriaSqlStringBuilder criteriaStringBuilder = new CriteriaSqlStringBuilder();
+        final SqlStringCriteriaProcessor criteriaStringBuilder = new SqlStringCriteriaProcessor();
         criteria.process(criteriaStringBuilder);
         
         final String sqlCriteria = criteriaStringBuilder.toString();

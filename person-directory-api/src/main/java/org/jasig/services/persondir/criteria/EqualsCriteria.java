@@ -10,7 +10,7 @@ public class EqualsCriteria extends CompareCriteria<Object> {
     }
 
     @Override
-    public boolean equals(Map<String, List<Object>> attributes) {
+    public boolean matches(Map<String, List<Object>> attributes) {
         final List<Object> values = attributes.get(this.getAttribute());
         
         for (final Object value : values) {

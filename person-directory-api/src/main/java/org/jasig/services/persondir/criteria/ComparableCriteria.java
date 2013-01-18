@@ -10,7 +10,7 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
     }
 
     @Override
-    public final boolean equals(Map<String, List<Object>> attributes) {
+    public final boolean matches(Map<String, List<Object>> attributes) {
         @SuppressWarnings("unchecked")
         final Comparable<Object> compareValue = (Comparable<Object>)this.getValue();
         
