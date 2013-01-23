@@ -3,14 +3,15 @@ package org.jasig.services.persondir.jdbc;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jasig.services.persondir.criteria.CriteriaProcessor;
+import org.jasig.services.persondir.criteria.AndCriteria;
+import org.jasig.services.persondir.criteria.BaseCriteriaProcessor;
+import org.jasig.services.persondir.criteria.BinaryLogicCriteria;
+import org.jasig.services.persondir.criteria.OrCriteria;
 
-public class SqlStringCriteriaProcessor implements CriteriaProcessor {
+public class SqlStringCriteriaProcessor extends BaseCriteriaProcessor {
     private final StringBuilder sb = new StringBuilder();
     private final List<Object> params = new ArrayList<Object>();
-    private boolean negated = false;
     
-    @Override
     public String toString() {
         return sb.toString();
     }
@@ -22,15 +23,16 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     public List<Object> getParams() {
         return params;
     }
-
+    
+    
     @Override
-    public void appendAndStart() {
+    public void appendBinaryLogicStart(BinaryLogicCriteria criteria) {
         sb.append("(");
     }
 
     @Override
-    public void appendAndSeperator() {
-        if (negated) {
+    public void appendAndSeperator(AndCriteria criteria) {
+        if (isNegated()) {
             sb.append(" OR ");
         }
         else {
@@ -39,18 +41,8 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     }
 
     @Override
-    public void appendAndEnd() {
-        sb.append(")");
-    }
-
-    @Override
-    public void appendOrStart() {
-        sb.append("(");
-    }
-
-    @Override
-    public void appendOrSeperator() {
-        if (negated) {
+    public void appendOrSeperator(OrCriteria criteria) {
+        if (isNegated()) {
             sb.append(" AND ");
         }
         else {
@@ -59,18 +51,8 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     }
 
     @Override
-    public void appendOrEnd() {
+    public void appendBinaryLogicEnd(BinaryLogicCriteria criteria) {
         sb.append(")");
-    }
-
-    @Override
-    public void appendNotStart() {
-        negated = !negated;
-    }
-
-    @Override
-    public void appendNotEnd() {
-        negated = !negated;
     }
 
     @Override
@@ -78,7 +60,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
         sb.append(name);
         if (value != null) {
             params.add(value);
-            if (negated) {
+            if (isNegated()) {
                 sb.append(" <> ?");
             }
             else {
@@ -86,7 +68,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
             }
         }
         else {
-            if (negated) {
+            if (isNegated()) {
                 sb.append(" IS NOT NULL");
             }
             else {
@@ -99,7 +81,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     public void appendLike(String name, Object value) {
         sb.append(name);
         params.add(value);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" NOT LIKE ?");
         }
         else {
@@ -111,7 +93,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     public void appendGreaterThan(String name, Comparable<?> value) {
         sb.append(name);
         params.add(value);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" <= ?");
         }
         else {
@@ -123,7 +105,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     public void appendGreaterThanOrEquals(String name, Comparable<?> value) {
         sb.append(name);
         params.add(value);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" < ?");
         }
         else {
@@ -135,7 +117,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     public void appendLessThan(String name, Comparable<?> value) {
         sb.append(name);
         params.add(value);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" >= ?");
         }
         else {
@@ -147,7 +129,7 @@ public class SqlStringCriteriaProcessor implements CriteriaProcessor {
     public void appendLessThanOrEquals(String name, Comparable<?> value) {
         sb.append(name);
         params.add(value);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" > ?");
         }
         else {

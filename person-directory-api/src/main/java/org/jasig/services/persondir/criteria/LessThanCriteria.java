@@ -14,6 +14,6 @@ public class LessThanCriteria extends ComparableCriteria {
     
     @Override
     public void process(CriteriaProcessor builder) {
-        builder.appendLessThan(this.getAttribute(), this.getValue());
+        builder.appendLessThan(this);
     }
 }

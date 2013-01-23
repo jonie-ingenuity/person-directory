@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 import org.jasig.services.persondir.AttributeQuery;
 import org.jasig.services.persondir.PersonAttributes;
@@ -16,6 +17,8 @@ import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
 import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
+
+import com.google.common.base.Function;
 
 public class SimpleAttributeQueryWorker 
         extends AbstractAttributeQueryWorker<
@@ -49,26 +52,25 @@ public class SimpleAttributeQueryWorker
 
     @Override
     protected Map<String, Object> filterQuery(Criteria criteria) {
-        // TODO Auto-generated method stub
-        
-        /*
-final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
+        final SimpleAttributeSourceConfig sourceConfig = getSourceConfig();
+        final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
         final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
-        return Maps.filterKeys(q, new Predicate<String>() {
-            public boolean apply(String input) {
-                return requiredQueryAttributes.contains(input) || optionalQueryAttributes.contains(input);
+        
+        final CriteriaToMapProcessor criteriaToMapProcessor = new CriteriaToMapProcessor(new Function<String, Boolean>() {
+            public Boolean apply(String attribute) {
+                return requiredQueryAttributes.contains(attribute) || optionalQueryAttributes.contains(attribute);
             }
         });
-         */
+        criteria.process(criteriaToMapProcessor);
         
-        return null;
+        return criteriaToMapProcessor.getAttributes();
     }
 
     @Override
     protected AttributeQueryTask createQueryCallable(AttributeQuery<Map<String, Object>> filteredQuery) {
         return new SimpleAttributeQueryCallable(filteredQuery);
     }
-
+    
     private final class SimpleAttributeQueryCallable extends AttributeQueryTask {
         private final AttributeQuery<Map<String, Object>> attributeQuery;
         

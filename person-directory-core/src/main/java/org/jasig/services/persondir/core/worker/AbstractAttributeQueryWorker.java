@@ -95,11 +95,6 @@ public abstract class AbstractAttributeQueryWorker<
         }
     }
     
-    /**
-     * Submit to the specified {@link ExecutorService} to execute
-     * 
-     * @throws IllegalStateException if {@link #submit(ExecutorService)} has already been called
-     */
     @Override
     public final void submit(ExecutorService service) {
         Assert.notNull(service);
@@ -143,44 +138,6 @@ public abstract class AbstractAttributeQueryWorker<
         this.futureResult = service.submit(task);
     }
 
-
-    private void setResult(List<PersonAttributes> result) {
-        this.result = result;
-        
-        //Empty result, cache it as a miss
-        if (result.isEmpty()) {
-            final Ehcache missCache = this.sourceConfig.getMissCache();
-            if (missCache != null) {
-                final Serializable cacheKey = this.getCacheKey();
-                missCache.put(new Element(cacheKey, result));
-            }
-        }
-        //Non-empty result, cacheit as a hit
-        else {
-            final Ehcache resultCache = this.sourceConfig.getResultCache();
-            if (resultCache != null) {
-                final Serializable cacheKey = getCacheKey();
-                resultCache.put(new Element(cacheKey, result));
-            }
-        }
-    }
-    
-    private void setError(Throwable t) {
-        this.error = t;
-        
-        final Ehcache errorCache = this.sourceConfig.getErrorCache();
-        if (errorCache != null) {
-            final Serializable cacheKey = this.getCacheKey();
-            errorCache.put(new Element(cacheKey, this.error));
-        }
-    }
-
-    /**
-     * Get the result of the attribute query, must be called after {@link #submit(ExecutorService)}
-     * 
-     * @throws InterruptedException if interrupted while waiting for the result
-     * @throws IllegalStateException if {@link #submit(ExecutorService)} has not been called yet
-     */
     @Override
     public final List<PersonAttributes> getResult() throws InterruptedException, TimeoutException {
         if (this.futureResult == null) {
@@ -200,49 +157,31 @@ public abstract class AbstractAttributeQueryWorker<
         return this.result;
     }
 
-    /**
-     * @return The number of milliseconds to wait for the result from this worker
-     */
     @Override
     public final long getCurrentWaitTime() {
         return Math.max(1, this.timeout - (System.currentTimeMillis() - this.started));
     }
     
-    /**
-     * @return The filtered query used by the worker
-     */
     @Override
     public final AttributeQuery<Q> getFilteredQuery() {
         return this.filteredQuery;
     }
     
-    /**
-     * @return The original query passed to the worker
-     */
     @Override
     public final AttributeQuery<Criteria> getOriginalQuery() {
         return originalQuery;
     }
 
-    /**
-     * @return The time submitted, -1 if not yet submitted
-     */
     @Override
     public final long getSubmitted() {
         return submitted;
     }
 
-    /**
-     * @return The time the query executed started, -1 if not yet started
-     */
     @Override
     public final long getStarted() {
         return started;
     }
 
-    /**
-     * @return The time the query completed, -1 if not yet completed
-     */
     @Override
     public final long getComplete() {
         return complete;
@@ -273,16 +212,13 @@ public abstract class AbstractAttributeQueryWorker<
         return futureResult.isDone();
     }
     
-    /**
-     * @return The underlying attribute source configuration for this worker
-     */
     @Override
     public final C getSourceConfig() {
         return sourceConfig;
     }
     
     /**
-     * Utility to rethrow a genertic Throwable with minimal wrapping
+     * Utility to rethrow a generic Throwable with minimal wrapping
      */
     protected final void rethrowUnchecked(Throwable t) {
         if (t instanceof RuntimeException) {
@@ -343,6 +279,38 @@ public abstract class AbstractAttributeQueryWorker<
      */
     protected abstract Q filterQuery(Criteria criteria);
 
+
+    private void setResult(List<PersonAttributes> result) {
+        this.result = result;
+        
+        //Empty result, cache it as a miss
+        if (result.isEmpty()) {
+            final Ehcache missCache = this.sourceConfig.getMissCache();
+            if (missCache != null) {
+                final Serializable cacheKey = this.getCacheKey();
+                missCache.put(new Element(cacheKey, result));
+            }
+        }
+        //Non-empty result, cacheit as a hit
+        else {
+            final Ehcache resultCache = this.sourceConfig.getResultCache();
+            if (resultCache != null) {
+                final Serializable cacheKey = getCacheKey();
+                resultCache.put(new Element(cacheKey, result));
+            }
+        }
+    }
+    
+    private void setError(Throwable t) {
+        this.error = t;
+        
+        final Ehcache errorCache = this.sourceConfig.getErrorCache();
+        if (errorCache != null) {
+            final Serializable cacheKey = this.getCacheKey();
+            errorCache.put(new Element(cacheKey, this.error));
+        }
+    }
+
     /**
      * Base {@link Callable} that does the query work, tracks start/stop time for the query
      */
@@ -369,6 +337,11 @@ public abstract class AbstractAttributeQueryWorker<
         protected abstract List<PersonAttributes> doQuery();
     }
     
+    /**
+     * Implementation of {@link AttributeQueryTask} used when a cached result is found. Used
+     * so that the core run logic of AttributeQueryTask doesn't have to be duplicated in the
+     * cached result handling code
+     */
     private class CachedAttributeQueryTask extends AttributeQueryTask {
         private final List<PersonAttributes> result;
         private final Throwable error;

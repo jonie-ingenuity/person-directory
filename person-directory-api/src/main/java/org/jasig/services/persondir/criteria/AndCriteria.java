@@ -36,14 +36,14 @@ public class AndCriteria extends BinaryLogicCriteria {
     
     @Override
     public void process(CriteriaProcessor builder) {
-        builder.appendAndStart();
+        builder.appendAndStart(this);
         for (final Iterator<Criteria> criteriaItr = this.getCriteriaList().iterator(); criteriaItr.hasNext(); ) {
             final Criteria criteria = criteriaItr.next();
             criteria.process(builder);
             if (criteriaItr.hasNext()) {
-                builder.appendAndSeperator();
+                builder.appendAndSeperator(this);
             }
         }
-        builder.appendAndEnd();
+        builder.appendAndEnd(this);
     }
 }

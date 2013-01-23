@@ -26,9 +26,9 @@ public class NotCriteria implements Criteria {
     
     @Override
     public void process(CriteriaProcessor builder) {
-        builder.appendNotStart();
+        builder.appendNotStart(this);
         this.criteria.process(builder);
-        builder.appendNotEnd();
+        builder.appendNotEnd(this);
     }
 
     @Override

@@ -14,6 +14,6 @@ public class GreaterThanCriteria extends ComparableCriteria {
     
     @Override
     public void process(CriteriaProcessor builder) {
-        builder.appendGreaterThan(this.getAttribute(), this.getValue());
+        builder.appendGreaterThan(this);
     }
 }

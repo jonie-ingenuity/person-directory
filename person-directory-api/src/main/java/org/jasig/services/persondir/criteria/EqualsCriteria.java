@@ -24,6 +24,6 @@ public class EqualsCriteria extends CompareCriteria<Object> {
     
     @Override
     public void process(CriteriaProcessor builder) {
-        builder.appendEquals(this.getAttribute(), this.getValue());
+        builder.appendEquals(this);
     }
 }

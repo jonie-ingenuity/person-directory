@@ -1,9 +1,8 @@
 package org.jasig.services.persondir.criteria;
 
 
-class ToStringCriteriaProcessor implements CriteriaProcessor {
+class ToStringCriteriaProcessor extends BaseCriteriaProcessor {
     private final StringBuilder sb = new StringBuilder();
-    private boolean negated = false;
     
     @Override
     public String toString() {
@@ -11,13 +10,13 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     }
     
     @Override
-    public void appendAndStart() {
+    public void appendBinaryLogicStart(BinaryLogicCriteria criteria) {
         sb.append("(");
     }
 
     @Override
-    public void appendAndSeperator() {
-        if (negated) {
+    public void appendAndSeperator(AndCriteria criteria) {
+        if (isNegated()) {
             sb.append(" || ");
         }
         else {
@@ -26,18 +25,8 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     }
 
     @Override
-    public void appendAndEnd() {
-        sb.append(")");
-    }
-
-    @Override
-    public void appendOrStart() {
-        sb.append("(");
-    }
-
-    @Override
-    public void appendOrSeperator() {
-        if (negated) {
+    public void appendOrSeperator(OrCriteria criteria) {
+        if (isNegated()) {
             sb.append(" && ");
         }
         else {
@@ -46,24 +35,14 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     }
 
     @Override
-    public void appendOrEnd() {
+    public void appendBinaryLogicEnd(BinaryLogicCriteria criteria) {
         sb.append(")");
-    }
-
-    @Override
-    public void appendNotStart() {
-        negated = !negated;
-    }
-
-    @Override
-    public void appendNotEnd() {
-        negated = !negated;
     }
 
     @Override
     public void appendEquals(String name, Object value) {
         sb.append(name);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" != ");
         }
         else {
@@ -75,7 +54,7 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     @Override
     public void appendLike(String name, Object value) {
         sb.append(name);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" !~ ");
         }
         else {
@@ -87,7 +66,7 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     @Override
     public void appendGreaterThan(String name, Comparable<?> value) {
         sb.append(name);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" <= ");
         }
         else {
@@ -99,7 +78,7 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     @Override
     public void appendGreaterThanOrEquals(String name, Comparable<?> value) {
         sb.append(name);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" < ");
         }
         else {
@@ -111,7 +90,7 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     @Override
     public void appendLessThan(String name, Comparable<?> value) {
         sb.append(name);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" >= ");
         }
         else {
@@ -123,7 +102,7 @@ class ToStringCriteriaProcessor implements CriteriaProcessor {
     @Override
     public void appendLessThanOrEquals(String name, Comparable<?> value) {
         sb.append(name);
-        if (negated) {
+        if (isNegated()) {
             sb.append(" > ");
         }
         else {
