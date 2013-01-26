@@ -1,4 +1,4 @@
-package org.jasig.services.persondir.core.worker;
+package org.jasig.services.persondir.core.criteria;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +14,14 @@ import org.jasig.services.persondir.criteria.OrCriteria;
 
 import com.google.common.base.Function;
 
-final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
+/**
+ * Filters a Criteria tree with the ability to selectively remove elements as well
+ * as simplify the criteria tree in the case of and/or logic that contains only a
+ * single sub-criteria 
+ * 
+ * @author Eric Dalquist
+ */
+public final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
     private Criteria rootCriteria = null;
     private final Stack<List<Criteria>> logicBuilders = new Stack<List<Criteria>>();
     private final Function<String, Boolean> attributeFilter;
@@ -36,7 +43,10 @@ final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
     public void appendAndEnd(AndCriteria criteria) {
         final List<Criteria> logicBuilder = this.logicBuilders.pop();
 
-        if (!logicBuilder.isEmpty()) {
+        if (logicBuilder.size() == 1) {
+            appendNewCriteria(logicBuilder.get(0));
+        }
+        else if (!logicBuilder.isEmpty()) {
             final AndCriteria logicCriteria = new AndCriteria(logicBuilder);
             appendNewCriteria(logicCriteria);
         }
@@ -46,23 +56,12 @@ final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
     public void appendOrEnd(OrCriteria criteria) {
         final List<Criteria> logicBuilder = this.logicBuilders.pop();
 
-        if (!logicBuilder.isEmpty()) {
+        if (logicBuilder.size() == 1) {
+            appendNewCriteria(logicBuilder.get(0));
+        }
+        else if (!logicBuilder.isEmpty()) {
             final OrCriteria logicCriteria = new OrCriteria(logicBuilder);
             appendNewCriteria(logicCriteria);
-        }
-    }
-
-    private void appendNewCriteria(Criteria logicCriteria) {
-        final List<Criteria> parentLogicBuilder = this.logicBuilders.peek();
-        
-        if (parentLogicBuilder != null) {
-            parentLogicBuilder.add(logicCriteria);
-        }
-        else if (this.rootCriteria != null) {
-            throw new IllegalArgumentException("Criteria tree resulted in two roots");
-        }
-        else {
-            this.rootCriteria = logicCriteria;
         }
     }
 
@@ -76,16 +75,7 @@ final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
         final List<Criteria> notChildCriteria = this.logicBuilders.pop();
         
         if (notChildCriteria.size() == 1) {
-            final List<Criteria> parentLogicBuilder = this.logicBuilders.peek();
-            if (parentLogicBuilder != null) {
-                parentLogicBuilder.add(new NotCriteria(notChildCriteria.get(0)));
-            }
-            else if (this.rootCriteria != null) {
-                throw new IllegalArgumentException("Criteria tree resulted in two roots");
-            }
-            else {
-                this.rootCriteria = new NotCriteria(notChildCriteria.get(0));
-            }
+            appendNewCriteria(new NotCriteria(notChildCriteria.get(0)));
         }
         else if (!notChildCriteria.isEmpty()) {
             throw new IllegalArgumentException("NotCriteria had " + notChildCriteria.size() + " children");
@@ -95,7 +85,28 @@ final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
     @Override
     public void appendCompare(CompareCriteria<?> criteria) {
         if (this.attributeFilter.apply(criteria.getAttribute())) {
-            
+            appendNewCriteria(criteria);
         }
+    }
+
+    private void appendNewCriteria(Criteria logicCriteria) {
+        final List<Criteria> parentLogicBuilder = getParentLogicBuilder();
+        if (parentLogicBuilder != null) {
+            parentLogicBuilder.add(logicCriteria);
+        }
+        else if (this.rootCriteria != null) {
+            throw new IllegalArgumentException("Criteria tree resulted in two roots");
+        }
+        else {
+            this.rootCriteria = logicCriteria;
+        }
+    }
+    
+    private List<Criteria> getParentLogicBuilder() {
+        if (this.logicBuilders.isEmpty()) {
+            return null;
+        }
+        
+        return this.logicBuilders.peek();
     }
 }

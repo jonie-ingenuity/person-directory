@@ -13,6 +13,7 @@ import org.jasig.services.persondir.core.PersonBuilder;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
 import org.jasig.services.persondir.core.config.SimpleAttributeSourceConfig;
+import org.jasig.services.persondir.core.criteria.CriteriaToMapFilteringProcessor;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.SimpleAttributeSource;
@@ -56,7 +57,7 @@ public class SimpleAttributeQueryWorker
         final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
         final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
         
-        final CriteriaToMapProcessor criteriaToMapProcessor = new CriteriaToMapProcessor(new Function<String, Boolean>() {
+        final CriteriaToMapFilteringProcessor criteriaToMapProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
             public Boolean apply(String attribute) {
                 return requiredQueryAttributes.contains(attribute) || optionalQueryAttributes.contains(attribute);
             }

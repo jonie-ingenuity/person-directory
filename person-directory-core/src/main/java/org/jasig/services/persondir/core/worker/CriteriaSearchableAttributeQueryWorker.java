@@ -11,6 +11,7 @@ import org.jasig.services.persondir.core.PersonBuilder;
 import org.jasig.services.persondir.core.config.AttributeSourceConfig;
 import org.jasig.services.persondir.core.config.CriteriaSearchableAttributeSourceConfig;
 import org.jasig.services.persondir.core.config.PersonDirectoryConfig;
+import org.jasig.services.persondir.core.criteria.CriteriaFilteringProcessor;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.spi.BaseAttributeSource;
 import org.jasig.services.persondir.spi.CriteriaSearchableAttributeSource;

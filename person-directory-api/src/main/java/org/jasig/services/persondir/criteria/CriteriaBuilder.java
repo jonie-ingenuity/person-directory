@@ -7,18 +7,30 @@ public final class CriteriaBuilder {
     }
     
     public static Criteria and(Criteria... c) {
+        if (c.length == 1) {
+            return c[0];
+        }
         return new AndCriteria(c);
     }
     
     public static Criteria and(Collection<Criteria> c) {
+        if (c.size() == 1) {
+            return c.iterator().next();
+        }
         return new AndCriteria(c);
     }
     
     public static Criteria or(Criteria... c) {
+        if (c.length == 1) {
+            return c[0];
+        }
         return new OrCriteria(c);
     }
     
     public static Criteria or(Collection<Criteria> c) {
+        if (c.size() == 1) {
+            return c.iterator().next();
+        }
         return new OrCriteria(c);
     }
     
