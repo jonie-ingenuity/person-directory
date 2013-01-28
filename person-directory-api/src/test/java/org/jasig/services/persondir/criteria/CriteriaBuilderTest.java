@@ -1,4 +1,4 @@
-package org.jasig.services.persondir.query;
+package org.jasig.services.persondir.criteria;
 
 import static org.junit.Assert.assertEquals;
 
