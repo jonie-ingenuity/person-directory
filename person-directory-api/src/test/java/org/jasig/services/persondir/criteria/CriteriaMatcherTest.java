@@ -5,9 +5,11 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Ignore;
 import org.junit.Test;
@@ -115,49 +117,33 @@ public class CriteriaMatcherTest {
         attributes.put("attr", Arrays.<Object>asList("20", null));
         assertFalse(c.matches(attributes));
         
-        //TODO date test
-    }
-    
-    
-    
-    
-    
-    @Ignore
-    @Test
-    public void testCriteriaMatches() {
-        Criteria c =
-                CriteriaBuilder.and(
-                    CriteriaBuilder.not(CriteriaBuilder.eq("phone", null)),
-                    CriteriaBuilder.eq("firstName", "jane"),
-                    CriteriaBuilder.gt("age", 13),
-                    CriteriaBuilder.gte("weight", 14),
-                    CriteriaBuilder.lt("height", 15),
-                    CriteriaBuilder.lte("length", 16),
-                    CriteriaBuilder.like("lastName", "Dalq*")
-            );
+        attributes.put("attr", Arrays.<Object>asList(new Date(1359479807085l), null));
+        assertFalse(c.matches(attributes));
         
-        Map<String, List<Object>> attributes = ImmutableMap.<String, List<Object>>builder()
-            .put("phone", Arrays.<Object>asList("608-698-4512"))
-            .put("firstName", Arrays.<Object>asList("jane"))
-            .put("age", Arrays.<Object>asList(14))
-            .put("weight", Arrays.<Object>asList(32))
-            .put("height", Arrays.<Object>asList(2))
-            .put("length", Arrays.<Object>asList(16))
-            .put("lastName", Arrays.<Object>asList("Dalquist"))
-            .build();
+        final long date = 1359479807085l;
         
+        c = new GreaterThanCriteria("attr", new Date(date));
+        
+        //util.Date vs util.Date
+        attributes.put("attr", Arrays.<Object>asList(new Date(date + TimeUnit.DAYS.toMillis(14)), null));
+        assertTrue(c.matches(attributes));
+
+        attributes.put("attr", Arrays.<Object>asList(new Date(date - TimeUnit.DAYS.toMillis(14)), null));
+        assertFalse(c.matches(attributes));
+        
+        //util.Date vs sql.Date
+        attributes.put("attr", Arrays.<Object>asList(new java.sql.Date(date + TimeUnit.DAYS.toMillis(14)), null));
         assertTrue(c.matches(attributes));
         
-        attributes = ImmutableMap.<String, List<Object>>builder()
-                .put("phone", Arrays.<Object>asList("608-698-4512"))
-                .put("firstName", Arrays.<Object>asList("jane"))
-                .put("age", Arrays.<Object>asList(14))
-                .put("weight", Arrays.<Object>asList(32))
-                .put("length", Arrays.<Object>asList(16))
-                .put("lastName", Arrays.<Object>asList("Hight"))
-                .build();
-            
-//        assertFalse(c.matches(attributes));
+        attributes.put("attr", Arrays.<Object>asList(new java.sql.Date(date - TimeUnit.DAYS.toMillis(14)), null));
+        assertFalse(c.matches(attributes));
         
+        //util.Date vs sql.Timestamp
+        attributes.put("attr", Arrays.<Object>asList(new java.sql.Timestamp(date + TimeUnit.DAYS.toMillis(14)), null));
+        assertTrue(c.matches(attributes));
+
+        attributes.put("attr", Arrays.<Object>asList(new java.sql.Timestamp(date - TimeUnit.DAYS.toMillis(14)), null));
+        assertFalse(c.matches(attributes));
     }
+
 }

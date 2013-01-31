@@ -2,6 +2,7 @@ package org.jasig.services.persondir.criteria;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -24,8 +25,7 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
         }
         
         //Get the value to compare against
-        @SuppressWarnings("unchecked")
-        final Comparable<Object> compareValue = (Comparable<Object>)this.getValue();
+        final Comparable<?> compareValue = (Comparable<?>)this.getValue();
         
         for (final Object attrValue : attrValues) {
             //Ignore null attribute values
@@ -35,7 +35,7 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
             
             //If the compare value and attribute value are of the same type just do a direct comparison
             if (compareValue.getClass().equals(attrValue.getClass())) {
-                return compare(compareValue, attrValue);
+                return compare((Comparable<Object>)compareValue, attrValue);
             }
             
             //Try doing a number comparison
@@ -43,11 +43,14 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
             if (compareNumber != null) {
                 final BigDecimal attrNumber = toBigDecimal(attrValue);
                 if (attrNumber != null) {
-                    return compare(compareNumber, attrNumber);
+                    return compare((Comparable<BigDecimal>)compareNumber, attrNumber);
                 }
             }
-            
-            //TODO Date/sql.Date/sql.Time/sql.Timestamp handling
+
+            //Handle Date and its various subclasses
+            if (compareValue instanceof Date && attrValue instanceof Date) {
+                return compare((Comparable<Date>)compareValue, (Date)attrValue);
+            }
         }
         
         return false;
