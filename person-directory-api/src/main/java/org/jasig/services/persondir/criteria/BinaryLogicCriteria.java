@@ -5,7 +5,7 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 
-public abstract class BinaryLogicCriteria implements Criteria {
+public abstract class BinaryLogicCriteria extends BaseCriteria {
     private final List<Criteria> criteriaList;
 
     public BinaryLogicCriteria(Criteria... criterias) {
@@ -17,7 +17,7 @@ public abstract class BinaryLogicCriteria implements Criteria {
     }
     
     public BinaryLogicCriteria(Collection<Criteria> criterias) {
-        if (criterias.size() < 1) {
+        if (criterias == null || criterias.size() < 1) {
             throw new IllegalArgumentException("At least one Criteria must be specified");
         }
 
@@ -59,12 +59,5 @@ public abstract class BinaryLogicCriteria implements Criteria {
         } else if (!criteriaList.equals(other.criteriaList))
             return false;
         return true;
-    }
-
-    @Override
-    public String toString() {
-        final ToStringCriteriaProcessor processor = new ToStringCriteriaProcessor();
-        this.process(processor);
-        return processor.toString();
     }
 }

@@ -1,7 +1,7 @@
 package org.jasig.services.persondir.criteria;
 
 
-public abstract class CompareCriteria<V> implements Criteria {
+public abstract class CompareCriteria<V> extends BaseCriteria {
     private final String attribute;
     private final V value;
 
@@ -53,12 +53,5 @@ public abstract class CompareCriteria<V> implements Criteria {
         } else if (!value.equals(other.value))
             return false;
         return true;
-    }
-
-    @Override
-    public String toString() {
-        final ToStringCriteriaProcessor processor = new ToStringCriteriaProcessor();
-        this.process(processor);
-        return processor.toString();
     }
 }

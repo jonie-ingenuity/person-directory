@@ -3,10 +3,13 @@ package org.jasig.services.persondir.criteria;
 import java.util.List;
 import java.util.Map;
 
-public class NotCriteria implements Criteria {
+public class NotCriteria extends BaseCriteria {
     private final Criteria criteria;
 
     public NotCriteria(Criteria criteria) {
+        if (criteria == null) {
+            throw new IllegalArgumentException("criteria cannot be null");
+        }
         this.criteria = criteria;
     }
 
@@ -55,12 +58,5 @@ public class NotCriteria implements Criteria {
         } else if (!criteria.equals(other.criteria))
             return false;
         return true;
-    }
-
-    @Override
-    public String toString() {
-        final ToStringCriteriaProcessor processor = new ToStringCriteriaProcessor();
-        this.process(processor);
-        return processor.toString();
     }
 }

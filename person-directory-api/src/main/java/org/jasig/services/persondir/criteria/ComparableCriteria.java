@@ -1,14 +1,13 @@
 package org.jasig.services.persondir.criteria;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> {
-    private BigDecimal compareNumber;
-    private boolean parsed = false;
+    private BigDecimal parsedCompareNumber;
+    private boolean numberParsed = false;
 
     public ComparableCriteria(String attribute, Comparable<?> value) {
         super(attribute, value);
@@ -35,13 +34,15 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
             
             //If the compare value and attribute value are of the same type just do a direct comparison
             if (compareValue.getClass().equals(attrValue.getClass())) {
-                return compare((Comparable<Object>)compareValue, attrValue);
+                @SuppressWarnings("unchecked")
+                final Comparable<Object> comparableValue = (Comparable<Object>)compareValue;
+                return compare(comparableValue, attrValue);
             }
             
             //Try doing a number comparison
             final BigDecimal compareNumber = getCompareNumber();
             if (compareNumber != null) {
-                final BigDecimal attrNumber = toBigDecimal(attrValue);
+                final BigDecimal attrNumber = MatchUtils.toBigDecimal(attrValue);
                 if (attrNumber != null) {
                     return compare((Comparable<BigDecimal>)compareNumber, attrNumber);
                 }
@@ -49,7 +50,9 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
 
             //Handle Date and its various subclasses
             if (compareValue instanceof Date && attrValue instanceof Date) {
-                return compare((Comparable<Date>)compareValue, (Date)attrValue);
+                @SuppressWarnings("unchecked")
+                final Comparable<Date> comparableValue = (Comparable<Date>)compareValue;
+                return compare(comparableValue, (Date)attrValue);
             }
         }
         
@@ -64,42 +67,16 @@ public abstract class ComparableCriteria extends CompareCriteria<Comparable<?>> 
     }
     
     private BigDecimal getCompareNumber() {
-        if (parsed) {
-            return compareNumber;
+        if (numberParsed) {
+            return parsedCompareNumber;
         }
         
         //Try parsing the value as a number, mark as parsed to handle parse-failure with boolen flag
         final Comparable<?> compareValue = this.getValue();
-        compareNumber = toBigDecimal(compareValue);
-        parsed = true;
+        parsedCompareNumber = MatchUtils.toBigDecimal(compareValue);
+        numberParsed = true;
         
-        return compareNumber;
-    }
-    
-    private static BigDecimal toBigDecimal(final Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof BigDecimal) {
-            return (BigDecimal) value;
-        }
-        if (value instanceof BigInteger) {
-            return new BigDecimal((BigInteger) value);
-        }
-        if (value instanceof Byte || value instanceof Short || 
-                value instanceof Integer || value instanceof Long) {
-            return new BigDecimal(((Number)value).longValue());
-        }
-        if (value instanceof Float || value instanceof Double) {
-            return new BigDecimal(((Number)value).doubleValue());
-        }
-
-        try {
-            return new BigDecimal(value.toString());
-        }
-        catch (final NumberFormatException e) {
-            return null;
-        }
+        return parsedCompareNumber;
     }
     
     /**
