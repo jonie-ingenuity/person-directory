@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.jasig.services.persondir.PersonAttributes;
-import org.jasig.services.persondir.util.attributes.PersonAttributesBuilder;
+import org.jasig.services.persondir.util.attributes.ImmutablePersonAttributesImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.ResultSetExtractor;
@@ -34,7 +34,7 @@ public class MultiRowResultSetAttributeExtractor
     }
 
     public List<PersonAttributes> extractData(ResultSet rs) throws SQLException {
-        final Map<String, PersonAttributesBuilder> resultsBuiler = new LinkedCaseInsensitiveMap<PersonAttributesBuilder>();
+        final Map<String, ImmutablePersonAttributesImpl.Builder> resultsBuiler = new LinkedCaseInsensitiveMap<ImmutablePersonAttributesImpl.Builder>();
         
         final ResultSetMetaData metaData = rs.getMetaData();
         
@@ -58,9 +58,9 @@ public class MultiRowResultSetAttributeExtractor
             final String mergeKey = (String)JdbcUtils.getResultSetValue(rs, mergeColumnIndex, String.class);
             
             //get/create the attributes builder for this merge value
-            PersonAttributesBuilder builder = resultsBuiler.get(mergeKey);
+            ImmutablePersonAttributesImpl.Builder builder = resultsBuiler.get(mergeKey);
             if (builder == null) {
-                builder = new PersonAttributesBuilder();
+                builder = new ImmutablePersonAttributesImpl.Builder();
                 resultsBuiler.put(mergeKey, builder);
                 
                 builder.add(this.mergeColumn, mergeKey);
@@ -101,7 +101,7 @@ public class MultiRowResultSetAttributeExtractor
         
         //Covert the attribute builders into concrete PersonAttribute instances
         final List<PersonAttributes> results = new ArrayList<PersonAttributes>(resultsBuiler.size());
-        for (final PersonAttributesBuilder builder : resultsBuiler.values()) {
+        for (final ImmutablePersonAttributesImpl.Builder builder : resultsBuiler.values()) {
             results.add(builder.build());
         }
         

@@ -86,4 +86,36 @@ public class ImmutablePersonAttributesImpl implements PersonAttributes {
     public String toString() {
         return attributes.toString();
     }
+    
+    /**
+     * Used to build an immutable {@link PersonAttributes} object.
+     */
+    public static class Builder {
+        final LinkedCaseInsensitiveMap<List<Object>> attributes = new LinkedCaseInsensitiveMap<List<Object>>();
+        
+        /**
+         * @return An {@link ImmutablePersonAttributesImpl} based on the attributes added via {@link #add(String, Object)}
+         */
+        public ImmutablePersonAttributesImpl build() {
+            return new ImmutablePersonAttributesImpl(attributes);
+        }
+        
+        /**
+         * Add an attribute
+         */
+        public void add(String name, Object value) {
+            List<Object> values = this.attributes.get(name);
+            if (values == null) {
+                values = new ArrayList<Object>(1);
+                this.attributes.put(name, values);
+            }
+            
+            if (value instanceof Collection<?>) {
+                values.addAll((Collection<?>)value);
+            }
+            else {
+                values.add(value);
+            }
+        }
+    }
 }
