@@ -28,6 +28,7 @@ public class NamedParameterJdbcPersonSourceTest {
     @Mock private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
     
     @Test
+    @SuppressWarnings("unchecked")
     public void test() {
         final String sql = "SELECT NAME FROM USERS WHERE USERNAME=:username";
         final Map<String, Object> searchAttributes = ImmutableMap.<String, Object>of("username", "jdoe");

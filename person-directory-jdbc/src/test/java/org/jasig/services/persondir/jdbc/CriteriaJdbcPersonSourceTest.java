@@ -31,6 +31,7 @@ public class CriteriaJdbcPersonSourceTest {
     @Mock private ResultSetExtractor<List<PersonAttributes>> resultSetExtractor;
     
     @Test
+    @SuppressWarnings("unchecked")
     public void testSearchForAttributes() {
         final String sql = "SELECT NAME FROM USERS WHERE {}";
         final Criteria criteria = CriteriaBuilder.eq("username", "jdoe");
