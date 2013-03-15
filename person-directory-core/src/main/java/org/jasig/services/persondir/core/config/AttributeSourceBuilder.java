@@ -9,7 +9,6 @@ import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
  * 
  * @author Eric Dalquist
  * @param <T> The concrete type of the superclass, used to allow builder pattern with an abstract class
- * @param <S> The attribute source type
  */
 public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T>> {
     /**

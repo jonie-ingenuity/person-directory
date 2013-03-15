@@ -14,7 +14,7 @@ import org.jasig.services.persondir.spi.gate.AttributeSourceGate;
  * Configuration common to all attribute sources
  * 
  * @author Eric Dalquist
- * @param <S>
+ * @param <S> The {@link BaseAttributeSource} type that is being configured
  */
 public interface AttributeSourceConfig<S extends BaseAttributeSource> {
     /**
