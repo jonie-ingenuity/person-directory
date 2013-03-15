@@ -11,5 +11,9 @@ import org.jasig.services.persondir.criteria.Criteria;
  * @author Eric Dalquist
  */
 public interface AttributeSourceGate {
+    /**
+     * @param query The query being executed
+     * @return true if the query passes and the gated attribute source should be queried.
+     */
     boolean checkSearch(AttributeQuery<Criteria> query);
 }
