@@ -42,7 +42,7 @@
     <appender-ref ref="N"/>
   </logger>
   <root level="TRACE">
-    <appender-ref ref="C"/>
+    <appender-ref ref="N"/>
   </root>
   <!-- 
   <logger name="org.hibernate.SQL" additivity="false" level="DEBUG">
