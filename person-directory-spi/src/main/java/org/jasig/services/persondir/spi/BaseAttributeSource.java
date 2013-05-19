@@ -9,7 +9,8 @@ import java.util.Set;
  */
 public interface BaseAttributeSource {
     /**
-     * @return Set of attributes this source might return, may be an empty set of the source does not know.
+     * @return Set of attributes names this source might return, may be an empty set of the source does not know.
+     * These are the private/source side attribute names.
      */
     Set<String> getAvailableAttributes();
 }

@@ -291,7 +291,7 @@ public abstract class AbstractAttributeQueryWorker<
                 missCache.put(new Element(cacheKey, result));
             }
         }
-        //Non-empty result, cacheit as a hit
+        //Non-empty result, cache it as a hit
         else {
             final Ehcache resultCache = this.sourceConfig.getResultCache();
             if (resultCache != null) {

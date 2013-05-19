@@ -1,6 +1,7 @@
 package org.jasig.services.persondir.core;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -86,7 +87,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
 
     @Override
     public List<Person> searchForPeople(AttributeQuery<Criteria> attributeQuery) {
-        
+        //First stop is the mergeCache to see if there is a cached result for the query
         Serializable mergeCacheKey = null;
         final Ehcache mergeCache = config.getMergeCache();
         if (mergeCache != null) {
@@ -95,13 +96,11 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             
             final Element mergeElement = mergeCache.get(mergeCacheKey);
             if (mergeElement != null) {
-                return (List<Person>)mergeElement.getObjectValue();
+                @SuppressWarnings("unchecked")
+                final List<Person> result = (List<Person>)mergeElement.getObjectValue();
+                return result;
             }
         }
-        
-        /*
-         * TODO attribute transformation API (includes mapping)
-         */
         
         //Set of workers that have been submitted for execution
         final Set<AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>>> 
@@ -119,17 +118,20 @@ public final class PersonDirectoryImpl implements PersonDirectory {
         //Collects attribute results
         final Map<String, PersonBuilder> personBuilders = new LinkedHashMap<String, PersonBuilder>();
 
-        //Track if there are more sources to execute
+        //Tracks if there are more sources to execute
         boolean hasMoreSources = !multiPassSources.isEmpty();
-        //Track if the result set has changed
+        
+        //Tracks if the result set has changed
         boolean resultHaveChanged = false;
+        
+        //Loop while hasMoreSources AND resultHaveChanged
         do {
             //We have new results, execute any pending sources on the current result set
             if (resultHaveChanged) {
                 //Reset hasMoreSources so that it is only true if one of the results actually has more sources to run
                 hasMoreSources = false;
 
-                //do pass 2..N queries on remaining sources if the result set has changed as we might be able to run new queries
+                //Additional Passes: run query on remaining sources if the result set has changed enough so that we might be able to run new queries
                 for (final PersonBuilder personBuilder : personBuilders.values()) {
                     final boolean hasMorePending = this.runPendingSources(personBuilder, attributeQuery, runningWorkers, completeWorkers);
                     hasMoreSources = hasMoreSources || hasMorePending;
@@ -139,8 +141,8 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             //Reset resultsHaveChanged flag so that it is only true if we get additional result data from the currently executing workers
             resultHaveChanged = false;
             
-            //Calculate the maximum time to wait for a result based on the currently executing workers
-            long maxWaitTime = getMaxWaitTime(runningWorkers);
+            //Get the maximum time to wait for a result based on the currently executing workers
+            final long maxWaitTime = getMaxWaitTime(runningWorkers);
             
             //Wait for a result to appear in the completeWorker Queue
             AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> completeWorker = null;
@@ -154,6 +156,8 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             }
             
             if (completeWorker == null) {
+                //TODO do we need logging here about the timeouts?
+
                 // uhoh everything in-progress took longer than it should have and we can't have any new results at this point
                 // Cancel all in-progress workers and break out of the loop
                 for (final AttributeQueryWorker<?, ? extends AttributeSourceConfig<? extends BaseAttributeSource>> queryWorker : runningWorkers) {
@@ -177,20 +181,14 @@ public final class PersonDirectoryImpl implements PersonDirectory {
             }
         } while (hasMoreSources && resultHaveChanged);
         
-        final Criteria originalCriteria = attributeQuery.getQuery();
+        //*************************//
+        // Querying Is Complete!
+        //*************************//
         
-        //Generate the List<Person> from the builders, filtering each basedon the original filter
-        final ImmutableList.Builder<Person> resultsBuilder = ImmutableList.builder();
-        for (final PersonBuilder personBuilder : personBuilders.values()) {
-            final Map<String, List<Object>> attributes = personBuilder.getAttributes();
-            if (originalCriteria.matches(attributes)) {
-                //Only include results that match the original filter
-                resultsBuilder.add(personBuilder.build());
-            }
-        }
+        //Build the results list
+        final List<Person> results = buildResults(attributeQuery, personBuilders.values());
         
         //Cache the result if the merge cache is enabled
-        final ImmutableList<Person> results = resultsBuilder.build();
         if (mergeCache != null) {
             mergeCache.put(new Element(mergeCacheKey, results));
         }
@@ -390,10 +388,35 @@ public final class PersonDirectoryImpl implements PersonDirectory {
         
         return true;
     }
+
+    /**
+     * Build the result list from the personBuilders.
+     * 
+     * @param attributeQuery Original attribute query
+     * @param personBuilders map of person builders
+     * @return
+     */
+    protected List<Person> buildResults(AttributeQuery<Criteria> attributeQuery, Collection<PersonBuilder> personBuilders) {
+        //Get the original criteria query to do in-memory result filtering
+        final Criteria originalCriteria = attributeQuery.getQuery();
+        
+        //Generate the List<Person> from the builders
+        //Each attribute map is matched against the original Criteria
+        final ImmutableList.Builder<Person> resultsBuilder = ImmutableList.builder();
+        for (final PersonBuilder personBuilder : personBuilders) {
+            final Map<String, List<Object>> attributes = personBuilder.getAttributes();
+            if (originalCriteria.matches(attributes)) {
+                //Only include results that match the original filter
+                resultsBuilder.add(personBuilder.build());
+            }
+        }
+        
+        return resultsBuilder.build();
+    }
     
     @Override
     public Set<String> getSearchableAttributeNames() {
-        //TODO cache this for a short time?
+        //TODO cache this for a short time
         final Builder<String> attributeNamesBuilder = ImmutableSet.builder();
         
         for (final AttributeSourceConfig<?> sourceConfig : this.config.getSourceConfigs()) {
@@ -409,7 +432,7 @@ public final class PersonDirectoryImpl implements PersonDirectory {
 
     @Override
     public Set<String> getAvailableAttributeNames() {
-        //TODO cache this for a short time?
+        //TODO cache this for a short time
         final Builder<String> attributeNamesBuilder = ImmutableSet.builder();
         
         for (final AttributeSourceConfig<?> sourceConfig : this.config.getSourceConfigs()) {

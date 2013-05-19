@@ -21,6 +21,11 @@ import org.jasig.services.persondir.spi.cache.CacheKeyGenerator;
 
 import com.google.common.base.Function;
 
+/**
+ * Implementation for simple attribute queries
+ * 
+ * @author Eric Dalquist
+ */
 public class SimpleAttributeQueryWorker 
         extends AbstractAttributeQueryWorker<
             Map<String, Object>, 
@@ -46,11 +51,18 @@ public class SimpleAttributeQueryWorker
         super(personDirectoryConfig, sourceConfig, personBuilder, attributeQuery, completedWorkerQueue);
     }
 
+    /**
+     * Call {@link CacheKeyGenerator#generateMapCacheKey(AttributeQuery)}
+     */
     @Override
     protected Serializable generateCacheKey(AttributeQuery<Map<String, Object>> attributeQuery, CacheKeyGenerator keyGenerator) {
         return keyGenerator.generateMapCacheKey(attributeQuery);
     }
 
+    /**
+     * Convert a Critera into a query Map filtering out attributes that don't apply
+     * to this attribute source
+     */
     @Override
     protected Map<String, Object> filterQuery(Criteria criteria) {
         final SimpleAttributeSourceConfig sourceConfig = getSourceConfig();

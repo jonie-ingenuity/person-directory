@@ -81,8 +81,8 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> {
     boolean isIgnoreUnmappedAttributes();
 
     /**
-     * Mapping of attribute names as returned by the {@link BaseAttributeSource} to the attribute names that
-     * are returned to the person directory client. 
+     * Mapping of source/private attribute names (the keys) to the client/public attribute
+     * names (the values).
      * 
      * @see AttributeSourceBuilder#addAttributeMapping(String, String)
      */
@@ -90,6 +90,7 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> {
 
     /**
      * @return Attributes that MUST be included in any attribute query, may be empty, never null.
+     * The attribute names are the client/public side attribute names.
      * 
      * @see AttributeSourceBuilder#addRequiredAttribute(String...)
      */
@@ -97,6 +98,7 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> {
 
     /**
      * @return Attributes that MAY be included in any attribute query, may be empty, never null.
+     * The attribute names are the client/public side attribute names.
      * 
      * @see AttributeSourceBuilder#addOptionalAttribute(String...)
      */
@@ -104,6 +106,7 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> {
     
     /**
      * @return Optional set of attributes returned by this source, may be empty, never null.
+     * The attribute names are the client/public side attribute names.
      * 
      * @see AttributeSourceBuilder#addAvailableAttribute(String...)
      */

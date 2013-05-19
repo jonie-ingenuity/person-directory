@@ -18,6 +18,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Multimap;
 
 abstract class AbstractAttributeSourceConfigBuilder<
@@ -83,9 +84,25 @@ abstract class AbstractAttributeSourceConfigBuilder<
         //Make collections immutable as these can't easily be changed at runtime
         this.gates = ImmutableList.copyOf(this.gates);
         this.attributeMapping = ImmutableMultimap.copyOf(this.attributeMapping);
-        this.requiredAttributes = ImmutableSet.copyOf(this.requiredAttributes);
-        this.optionalAttributes = ImmutableSet.copyOf(this.optionalAttributes);
-        this.availableAttributes = ImmutableSet.copyOf(this.availableAttributes);
+
+        //Map private to public attribute names
+        this.requiredAttributes = mapPrivateToPublic(this.requiredAttributes);
+        this.optionalAttributes = mapPrivateToPublic(this.optionalAttributes);
+        this.availableAttributes = mapPrivateToPublic(this.availableAttributes);
+    }
+    
+    protected final Set<String> mapPrivateToPublic(Set<String> privateNames) {
+        final Builder<String> publicNames = ImmutableSet.builder();
+        for (final String privateName : privateNames) {
+            final Collection<String> publicMappedNames = this.attributeMapping.get(privateName);
+            if (publicMappedNames == null || publicMappedNames.isEmpty()) {
+                publicNames.add(privateName);
+            }
+            else {
+                publicNames.addAll(publicMappedNames);
+            }
+        }
+        return publicNames.build();
     }
 
     @Override
@@ -290,6 +307,24 @@ abstract class AbstractAttributeSourceConfigBuilder<
 
     @Override
     public final Set<String> getAvailableAttributes() {
+        final Set<String> sourceAvailablePrivateAttributes = this.getAttributeSource().getAvailableAttributes();
+        
+        //If the source has available attributes include them in the returned set
+        if (!sourceAvailablePrivateAttributes.isEmpty()) {
+            final Set<String> sourceAvailablePublicAttributes = mapPrivateToPublic(sourceAvailablePrivateAttributes);
+
+            //If no hard-coded available attributes return the set form the source
+            if (availableAttributes.isEmpty()) {
+                return sourceAvailablePublicAttributes;
+            }
+            
+            //Both sets contain data, combine them
+            final Builder<String> builder = ImmutableSet.builder();
+            builder.addAll(sourceAvailablePublicAttributes);
+            builder.addAll(availableAttributes);
+            return builder.build();
+        }
+        
         return availableAttributes;
     }
 }

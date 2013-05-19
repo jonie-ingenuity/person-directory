@@ -91,24 +91,24 @@ public interface AttributeSourceBuilder<T extends AttributeSourceBuilder<T>> {
     T setIgnoreUnmappedAttributes(boolean ignoreUnmappedAttributes);
 
     /**
-     * Add a mapping between the sourceAttribute, from the query, to the directoryAttribute
-     * which is used by the person directory client.
+     * Add a mapping between the source/private attribute, from the query, to the client/public
+     * attribute which is used by the person directory client.
      * 
      * @see AttributeSourceConfig#getAttributeMapping()
      */
     T addAttributeMapping(String sourceAttribute, String directoryAttribute);
 
     /**
-     * Add an attribute that is required for the query to run. The attribute is a source-side
-     * attribute. 
+     * Add an attribute that is required for the query to run.
+     * The attribute names are the source/private side attribute names. 
      * 
      * @see AttributeSourceConfig#getRequiredQueryAttributes()
      */
     T addRequiredAttribute(String... sourceAttribute);
 
     /**
-     * Add an attribute that can be used to run a query. The attribute is a source-side
-     * attribute. 
+     * Add an attribute that can be used to run a query.
+     * The attribute names are the source/private side attribute names. 
      * 
      * @see AttributeSourceConfig#getOptionalQueryAttributes()
      */
