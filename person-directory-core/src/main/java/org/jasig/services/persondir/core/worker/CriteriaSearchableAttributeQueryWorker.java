@@ -1,7 +1,9 @@
 package org.jasig.services.persondir.core.worker;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
@@ -63,9 +65,23 @@ public class CriteriaSearchableAttributeQueryWorker
         final Set<String> requiredQueryAttributes = sourceConfig.getRequiredQueryAttributes();
         final Set<String> optionalQueryAttributes = sourceConfig.getOptionalQueryAttributes();
         
-        final CriteriaFilteringProcessor criteriaFilterProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String attribute) {
-                return requiredQueryAttributes.contains(attribute) || optionalQueryAttributes.contains(attribute);
+        final Map<String, Collection<String>> reverseAttributeMapping = sourceConfig.getReverseAttributeMapping();
+        
+        final CriteriaFilteringProcessor criteriaFilterProcessor = new CriteriaFilteringProcessor(new Function<String, String>() {
+            public String apply(String attribute) {
+                //Check if the source can actually handle this attribute
+                if (!requiredQueryAttributes.contains(attribute) && !optionalQueryAttributes.contains(attribute)) {
+                    return null;
+                }
+                
+                //See if the attribute needs to get un-mapped
+                final Collection<String> privateAttributes = reverseAttributeMapping.get(attribute);
+                if (privateAttributes == null || privateAttributes.isEmpty()) {
+                    return attribute;
+                }
+
+                //TODO what if there is more than one attribute?
+                return privateAttributes.iterator().next();
             }
         });
         

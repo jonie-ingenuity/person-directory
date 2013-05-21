@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 /**
  * {@link #PATTERN} is used as the wildcard character for like comparisons
  */
-public class LikeCriteria extends CompareCriteria<String> {
+public final class LikeCriteria extends CompareCriteria<String> {
     public static final String PATTERN = "*";
     private static final Pattern WILDCARD_PATTERN = Pattern.compile(Pattern.quote(PATTERN));
     
@@ -20,6 +20,11 @@ public class LikeCriteria extends CompareCriteria<String> {
         }
     }
     
+    @Override
+    public CompareCriteria<String> getWithNewAttribute(String newAttribute) {
+        return new LikeCriteria(newAttribute, getValue());
+    }
+
     private Pattern getValuePattern() {
         if (this.valuePattern != null) {
             return this.valuePattern;

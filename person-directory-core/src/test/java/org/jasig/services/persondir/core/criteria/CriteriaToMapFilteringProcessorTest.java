@@ -6,10 +6,9 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 
+import org.jasig.services.persondir.core.util.NullFunction;
 import org.jasig.services.persondir.criteria.AndCriteria;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
@@ -17,19 +16,18 @@ import org.jasig.services.persondir.criteria.EqualsCriteria;
 import org.jasig.services.persondir.criteria.NotCriteria;
 import org.jasig.services.persondir.criteria.OrCriteria;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 public class CriteriaToMapFilteringProcessorTest {
     @Test
     public void testSingleCriteriaIncluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(Functions.<String>identity());
         
         final Criteria c = new EqualsCriteria("attr", "value");
         c.process(criteriaFilteringProcessor);
@@ -41,11 +39,7 @@ public class CriteriaToMapFilteringProcessorTest {
 
     @Test
     public void testSingleCriteriaExcluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
-            }
-        });
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(NullFunction.<String, String>instance());
         
         final Criteria c = new EqualsCriteria("attr", "value");
         c.process(criteriaFilteringProcessor);
@@ -56,11 +50,7 @@ public class CriteriaToMapFilteringProcessorTest {
     
     @Test
     public void testSingleNotCriteriaIncluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(Functions.<String>identity());
         
         final Criteria c = new NotCriteria(new EqualsCriteria("attr", "value"));
         c.process(criteriaFilteringProcessor);
@@ -72,9 +62,9 @@ public class CriteriaToMapFilteringProcessorTest {
 
     @Test
     public void testSingleNotCriteriaExcluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, String>() {
+            public String apply(String input) {
+                return null;
             }
         });
         
@@ -87,11 +77,7 @@ public class CriteriaToMapFilteringProcessorTest {
     
     @Test
     public void testSingleAndCriteriaIncluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(Functions.<String>identity());
         
         final Criteria ec = new EqualsCriteria("attr", "value");
         final Criteria c = new AndCriteria(ec);
@@ -105,9 +91,9 @@ public class CriteriaToMapFilteringProcessorTest {
 
     @Test
     public void testSingleAndCriteriaExcluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, String>() {
+            public String apply(String input) {
+                return null;
             }
         });
         
@@ -120,11 +106,7 @@ public class CriteriaToMapFilteringProcessorTest {
     
     @Test
     public void testSingleOrCriteriaIncluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(Functions.<String>identity());
         
         final Criteria ec = new EqualsCriteria("attr", "value");
         final Criteria c = new OrCriteria(ec);
@@ -137,9 +119,9 @@ public class CriteriaToMapFilteringProcessorTest {
 
     @Test
     public void testSingleOrCriteriaExcluded() {
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, String>() {
+            public String apply(String input) {
+                return null;
             }
         });
         
@@ -153,10 +135,19 @@ public class CriteriaToMapFilteringProcessorTest {
     @Test
     public void testMultipleAndCriteriaIncExc() {
         @SuppressWarnings("unchecked")
-        final Function<String, Boolean> filter = mock(Function.class);
+        final Function<String, String> filter = mock(Function.class);
         final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(filter);
         
-        when(filter.apply(anyString())).thenReturn(true, false, true);
+        when(filter.apply(anyString())).thenAnswer(new Answer<String>() {
+            private int count = 0;
+            @Override
+            public String answer(InvocationOnMock invocation) throws Throwable {
+                if ((count++) % 2 == 0) {
+                    return (String)invocation.getArguments()[0];
+                }
+                return null;
+            }
+        });
         
         final Criteria c = new AndCriteria(new EqualsCriteria("attr1", "value1"), new EqualsCriteria("attr2", "value2"), new EqualsCriteria("attr3", "value3"));
         c.process(criteriaFilteringProcessor);
@@ -169,10 +160,19 @@ public class CriteriaToMapFilteringProcessorTest {
     @Test
     public void testMultipleOrCriteriaIncExc() {
         @SuppressWarnings("unchecked")
-        final Function<String, Boolean> filter = mock(Function.class);
+        final Function<String, String> filter = mock(Function.class);
         final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(filter);
         
-        when(filter.apply(anyString())).thenReturn(true, false, true);
+        when(filter.apply(anyString())).thenAnswer(new Answer<String>() {
+            private int count = 0;
+            @Override
+            public String answer(InvocationOnMock invocation) throws Throwable {
+                if ((count++) % 2 == 0) {
+                    return (String)invocation.getArguments()[0];
+                }
+                return null;
+            }
+        });
         
         final Criteria c = new OrCriteria(new EqualsCriteria("attr1", "value1"), new EqualsCriteria("attr2", "value2"), new EqualsCriteria("attr3", "value3"));
         c.process(criteriaFilteringProcessor);
@@ -184,19 +184,7 @@ public class CriteriaToMapFilteringProcessorTest {
     
     @Test
     public void testComplexCriteria() {
-        final Random r = new Random(2);
-        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new Function<String, Boolean>() {
-            private final Map<String, Boolean> included = new HashMap<String, Boolean>();
-            public Boolean apply(String input) {
-                Boolean result = included.get(input);
-                if (result != null) {
-                    return result;
-                }
-                result = r.nextBoolean();
-                included.put(input, result);
-                return result;
-            }
-        });
+        final CriteriaToMapFilteringProcessor criteriaFilteringProcessor = new CriteriaToMapFilteringProcessor(new RandomFilter());
         
         final Criteria c =
                 CriteriaBuilder.or(

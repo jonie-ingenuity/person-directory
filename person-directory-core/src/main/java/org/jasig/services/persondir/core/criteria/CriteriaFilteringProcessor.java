@@ -24,9 +24,9 @@ import com.google.common.base.Function;
 public final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
     private Criteria rootCriteria = null;
     private final Stack<List<Criteria>> logicBuilders = new Stack<List<Criteria>>();
-    private final Function<String, Boolean> attributeFilter;
+    private final Function<String, String> attributeFilter;
     
-    public CriteriaFilteringProcessor(Function<String, Boolean> attributeFilter) {
+    public CriteriaFilteringProcessor(Function<String, String> attributeFilter) {
         this.attributeFilter = attributeFilter;
     }
     
@@ -84,7 +84,13 @@ public final class CriteriaFilteringProcessor extends BaseCriteriaProcessor {
 
     @Override
     public void appendCompare(CompareCriteria<?> criteria) {
-        if (this.attributeFilter.apply(criteria.getAttribute())) {
+        final String newAttribute = this.attributeFilter.apply(criteria.getAttribute());
+        if (newAttribute != null) {
+            //If the newAttribute is not equal to the criteria attribute we need to remap it
+            if (!newAttribute.equals(criteria.getAttribute())) {
+                criteria = criteria.getWithNewAttribute(newAttribute);
+            }
+            
             appendNewCriteria(criteria);
         }
     }

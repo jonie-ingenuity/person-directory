@@ -87,6 +87,14 @@ public interface AttributeSourceConfig<S extends BaseAttributeSource> {
      * @see AttributeSourceBuilder#addAttributeMapping(String, String)
      */
     Map<String, Collection<String>> getAttributeMapping();
+    
+    /**
+     * Mapping of client/public attribute names (the keys) to the source/private attribute
+     * names (the values)
+     * 
+     * @see #getAttributeMapping()
+     */
+    Map<String, Collection<String>> getReverseAttributeMapping();
 
     /**
      * @return Attributes that MUST be included in any attribute query, may be empty, never null.

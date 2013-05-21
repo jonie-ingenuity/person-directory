@@ -6,10 +6,7 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-
+import org.jasig.services.persondir.core.util.NullFunction;
 import org.jasig.services.persondir.criteria.AndCriteria;
 import org.jasig.services.persondir.criteria.Criteria;
 import org.jasig.services.persondir.criteria.CriteriaBuilder;
@@ -17,17 +14,16 @@ import org.jasig.services.persondir.criteria.EqualsCriteria;
 import org.jasig.services.persondir.criteria.NotCriteria;
 import org.jasig.services.persondir.criteria.OrCriteria;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 
 public class CriteriaFilteringProcessorTest {
     @Test
     public void testSingleCriteriaIncluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(Functions.<String>identity());
         
         final Criteria c = new EqualsCriteria("attr", "value");
         c.process(criteriaFilteringProcessor);
@@ -38,11 +34,7 @@ public class CriteriaFilteringProcessorTest {
 
     @Test
     public void testSingleCriteriaExcluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(NullFunction.<String, String>instance());
         
         final Criteria c = new EqualsCriteria("attr", "value");
         c.process(criteriaFilteringProcessor);
@@ -53,11 +45,7 @@ public class CriteriaFilteringProcessorTest {
     
     @Test
     public void testSingleNotCriteriaIncluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(Functions.<String>identity());
         
         final Criteria c = new NotCriteria(new EqualsCriteria("attr", "value"));
         c.process(criteriaFilteringProcessor);
@@ -68,11 +56,7 @@ public class CriteriaFilteringProcessorTest {
 
     @Test
     public void testSingleNotCriteriaExcluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(NullFunction.<String, String>instance());
         
         final Criteria c = new NotCriteria(new EqualsCriteria("attr", "value"));
         c.process(criteriaFilteringProcessor);
@@ -83,11 +67,7 @@ public class CriteriaFilteringProcessorTest {
     
     @Test
     public void testSingleAndCriteriaIncluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(Functions.<String>identity());
         
         final Criteria ec = new EqualsCriteria("attr", "value");
         final Criteria c = new AndCriteria(ec);
@@ -99,11 +79,7 @@ public class CriteriaFilteringProcessorTest {
 
     @Test
     public void testSingleAndCriteriaExcluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(NullFunction.<String, String>instance());
         
         final Criteria c = new AndCriteria(new EqualsCriteria("attr", "value"));
         c.process(criteriaFilteringProcessor);
@@ -114,11 +90,7 @@ public class CriteriaFilteringProcessorTest {
     
     @Test
     public void testSingleOrCriteriaIncluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return true;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(Functions.<String>identity());
         
         final Criteria ec = new EqualsCriteria("attr", "value");
         final Criteria c = new OrCriteria(ec);
@@ -130,11 +102,7 @@ public class CriteriaFilteringProcessorTest {
 
     @Test
     public void testSingleOrCriteriaExcluded() {
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            public Boolean apply(String input) {
-                return false;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(NullFunction.<String, String>instance());
         
         final Criteria c = new OrCriteria(new EqualsCriteria("attr", "value"));
         c.process(criteriaFilteringProcessor);
@@ -146,10 +114,19 @@ public class CriteriaFilteringProcessorTest {
     @Test
     public void testMultipleAndCriteriaIncExc() {
         @SuppressWarnings("unchecked")
-        final Function<String, Boolean> filter = mock(Function.class);
+        final Function<String, String> filter = mock(Function.class);
         final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(filter);
         
-        when(filter.apply(anyString())).thenReturn(true, false, true);
+        when(filter.apply(anyString())).thenAnswer(new Answer<String>() {
+            private int count = 0;
+            @Override
+            public String answer(InvocationOnMock invocation) throws Throwable {
+                if ((count++) % 2 == 0) {
+                    return (String)invocation.getArguments()[0];
+                }
+                return null;
+            }
+        });
         
         final Criteria c = new AndCriteria(new EqualsCriteria("attr1", "value1"), new EqualsCriteria("attr2", "value2"), new EqualsCriteria("attr3", "value3"));
         c.process(criteriaFilteringProcessor);
@@ -162,10 +139,19 @@ public class CriteriaFilteringProcessorTest {
     @Test
     public void testMultipleOrCriteriaIncExc() {
         @SuppressWarnings("unchecked")
-        final Function<String, Boolean> filter = mock(Function.class);
+        final Function<String, String> filter = mock(Function.class);
         final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(filter);
         
-        when(filter.apply(anyString())).thenReturn(true, false, true);
+        when(filter.apply(anyString())).thenAnswer(new Answer<String>() {
+            private int count = 0;
+            @Override
+            public String answer(InvocationOnMock invocation) throws Throwable {
+                if ((count++) % 2 == 0) {
+                    return (String)invocation.getArguments()[0];
+                }
+                return null;
+            }
+        });
         
         final Criteria c = new OrCriteria(new EqualsCriteria("attr1", "value1"), new EqualsCriteria("attr2", "value2"), new EqualsCriteria("attr3", "value3"));
         c.process(criteriaFilteringProcessor);
@@ -177,19 +163,7 @@ public class CriteriaFilteringProcessorTest {
     
     @Test
     public void testComplexCriteria() {
-        final Random r = new Random(2);
-        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new Function<String, Boolean>() {
-            private final Map<String, Boolean> included = new HashMap<String, Boolean>();
-            public Boolean apply(String input) {
-                Boolean result = included.get(input);
-                if (result != null) {
-                    return result;
-                }
-                result = r.nextBoolean();
-                included.put(input, result);
-                return result;
-            }
-        });
+        final CriteriaFilteringProcessor criteriaFilteringProcessor = new CriteriaFilteringProcessor(new RandomFilter());
         
         final Criteria c =
                 CriteriaBuilder.or(

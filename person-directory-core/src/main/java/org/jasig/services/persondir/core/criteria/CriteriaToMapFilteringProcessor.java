@@ -20,9 +20,9 @@ import com.google.common.base.Function;
  */
 public final class CriteriaToMapFilteringProcessor extends BaseCriteriaProcessor {
     private final Map<String, Object> attributes = new LinkedHashMap<String, Object>();
-    private final Function<String, Boolean> attributeFilter;
+    private final Function<String, String> attributeFilter;
     
-    public CriteriaToMapFilteringProcessor(Function<String, Boolean> attributeFilter) {
+    public CriteriaToMapFilteringProcessor(Function<String, String> attributeFilter) {
         this.attributeFilter = attributeFilter;
     }
 
@@ -33,20 +33,23 @@ public final class CriteriaToMapFilteringProcessor extends BaseCriteriaProcessor
     @Override
     @SuppressWarnings("unchecked")
     public void appendCompare(String name, Object value) {
-        if (value != null && this.attributeFilter.apply(name)) {
-            final Object existingValue = attributes.get(name);
-            if (existingValue == null || existingValue.equals(value)) {
-                attributes.put(name, value);
-            }
-            else {
-                if (existingValue instanceof Set) {
-                    ((Set<Object>) existingValue).add(value);
+        if (value != null) {
+            final String newAttribute = this.attributeFilter.apply(name);
+            if (newAttribute != null) {
+                final Object existingValue = attributes.get(newAttribute);
+                if (existingValue == null || existingValue.equals(value)) {
+                    attributes.put(newAttribute, value);
                 }
                 else {
-                    final Set<Object> values = new LinkedHashSet<Object>();
-                    values.add(existingValue);
-                    values.add(value);
-                    attributes.put(name, values);
+                    if (existingValue instanceof Set) {
+                        ((Set<Object>) existingValue).add(value);
+                    }
+                    else {
+                        final Set<Object> values = new LinkedHashSet<Object>();
+                        values.add(existingValue);
+                        values.add(value);
+                        attributes.put(newAttribute, values);
+                    }
                 }
             }
         }

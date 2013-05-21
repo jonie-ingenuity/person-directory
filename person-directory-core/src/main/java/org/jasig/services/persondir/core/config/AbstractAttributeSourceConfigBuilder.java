@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 
 abstract class AbstractAttributeSourceConfigBuilder<
             T extends AttributeSourceBuilder<T>, 
@@ -40,6 +41,7 @@ abstract class AbstractAttributeSourceConfigBuilder<
     private volatile boolean ignoreUnmappedAttributes = false;
     private List<AttributeSourceGate> gates = new ArrayList<AttributeSourceGate>();
     private Multimap<String, String> attributeMapping = HashMultimap.create();
+    private Multimap<String, String> reverseAttributeMapping;
     private Set<String> requiredAttributes = new HashSet<String>();
     private Set<String> optionalAttributes = new HashSet<String>();
     private Set<String> availableAttributes = new HashSet<String>();
@@ -84,7 +86,8 @@ abstract class AbstractAttributeSourceConfigBuilder<
         //Make collections immutable as these can't easily be changed at runtime
         this.gates = ImmutableList.copyOf(this.gates);
         this.attributeMapping = ImmutableMultimap.copyOf(this.attributeMapping);
-
+        this.reverseAttributeMapping = ImmutableMultimap.copyOf(Multimaps.invertFrom(this.attributeMapping, HashMultimap.<String, String>create()));
+        
         //Map private to public attribute names
         this.requiredAttributes = mapPrivateToPublic(this.requiredAttributes);
         this.optionalAttributes = mapPrivateToPublic(this.optionalAttributes);
@@ -293,6 +296,11 @@ abstract class AbstractAttributeSourceConfigBuilder<
     @Override
     public final Map<String, Collection<String>> getAttributeMapping() {
         return attributeMapping.asMap();
+    }
+    
+    @Override
+    public Map<String, Collection<String>> getReverseAttributeMapping() {
+        return this.reverseAttributeMapping.asMap();
     }
 
     @Override

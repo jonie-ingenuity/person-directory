@@ -1,10 +1,15 @@
 package org.jasig.services.persondir.criteria;
 
 
-public class LessThanOrEqualsCriteria extends ComparableCriteria {
+public final class LessThanOrEqualsCriteria extends ComparableCriteria {
 
     public LessThanOrEqualsCriteria(String attribute, Comparable<?> value) {
         super(attribute, value);
+    }
+    
+    @Override
+    public CompareCriteria<Comparable<?>> getWithNewAttribute(String newAttribute) {
+        return new LessThanOrEqualsCriteria(newAttribute, getValue());
     }
 
     @Override

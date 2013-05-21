@@ -13,12 +13,17 @@ import java.util.Map;
  * 
  * @author Eric Dalquist
  */
-public class EqualsCriteria extends CompareCriteria<Object> {
+public final class EqualsCriteria extends CompareCriteria<Object> {
     private BigDecimal parsedCompareNumber;
     private boolean numberParsed = false;
 
     public EqualsCriteria(String attribute, Object value) {
         super(attribute, value);
+    }
+    
+    @Override
+    public CompareCriteria<Object> getWithNewAttribute(String newAttribute) {
+        return new EqualsCriteria(newAttribute, getValue());
     }
 
     @Override

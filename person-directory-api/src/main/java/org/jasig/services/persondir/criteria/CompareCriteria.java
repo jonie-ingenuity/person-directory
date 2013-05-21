@@ -10,6 +10,8 @@ public abstract class CompareCriteria<V> extends BaseCriteria {
         this.value = value;
     }
     
+    public abstract CompareCriteria<V> getWithNewAttribute(String newAttribute);
+    
     public final String getAttribute() {
         return attribute;
     }
