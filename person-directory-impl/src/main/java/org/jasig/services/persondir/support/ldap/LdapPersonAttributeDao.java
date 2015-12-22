@@ -131,7 +131,7 @@ public class LdapPersonAttributeDao extends AbstractQueryPersonAttributeDao<Logi
     private SearchControls searchControls = new SearchControls();
     private final boolean setReturningAttributes = true;
     private QueryType queryType = QueryType.AND;
-
+    private String suffixDelimiter;
 
     public LdapPersonAttributeDao() {
         this.searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
@@ -194,7 +194,7 @@ public class LdapPersonAttributeDao extends AbstractQueryPersonAttributeDao<Logi
         }
 
         //Insert the generated query into the template if it is configured
-        final String ldapQuery;
+        String ldapQuery;
         if (this.queryTemplate == null) {
             ldapQuery = generatedLdapQuery;
         }
@@ -204,6 +204,21 @@ public class LdapPersonAttributeDao extends AbstractQueryPersonAttributeDao<Logi
             if (logger.isDebugEnabled()) {
                 logger.debug("Final ldapQuery after applying queryTemplate: '" + ldapQuery + "'");
             }
+        }
+
+        String suffixDelimiter, newLdapQuery;
+        suffixDelimiter = newLdapQuery = "";
+
+        try {
+            suffixDelimiter = this.suffixDelimiter;
+        } catch (Exception e){
+            logger.warn("suffixDelimiter not set!!");
+        }
+
+
+        if (!suffixDelimiter.equals("") && ldapQuery.indexOf(suffixDelimiter) > 0 ){
+            newLdapQuery = ldapQuery.substring((ldapQuery.indexOf(suffixDelimiter)+suffixDelimiter.length()), (ldapQuery.length()-1));
+            ldapQuery = ldapQuery.replace(queryUserName, newLdapQuery);
         }
 
         //Execute the query
@@ -262,6 +277,13 @@ public class LdapPersonAttributeDao extends AbstractQueryPersonAttributeDao<Logi
      */
     public String getBaseDN() {
         return this.baseDN;
+    }
+
+    /**
+     * @param suffixDelimiter The suffixDelimiter to set.
+     */
+    public void setSuffixDelimiter(final String suffixDelimiter) {
+        this.suffixDelimiter = suffixDelimiter;
     }
 
     /**

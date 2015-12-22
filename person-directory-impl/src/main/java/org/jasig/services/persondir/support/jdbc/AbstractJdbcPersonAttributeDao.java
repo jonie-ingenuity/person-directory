@@ -88,6 +88,8 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
     private Map<CaseCanonicalizationMode,MessageFormat> dataAttributeCaseCanonicalizationFunctions =
             DEFAULT_DATA_ATTRIBUTE_CASE_CANONICALIZATION_FUNCTIONS;
 
+    private String suffixDelimiter;
+
     public AbstractJdbcPersonAttributeDao() {
         super();
         this.simpleJdbcTemplate = null;
@@ -128,6 +130,12 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
         this.queryType = queryType;
     }
 
+    /**
+     * @param suffixDelimiter The suffixDelimiter to set.
+     */
+    public void setSuffixDelimiter(final String suffixDelimiter) {
+        this.suffixDelimiter = suffixDelimiter;
+    }
 
     /**
      * Takes the {@link List} from the query and parses it into the {@link List} of {@link IPersonAttributes} attributes to be returned.
@@ -222,13 +230,29 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
         final ParameterizedRowMapper<R> rowMapper = this.getRowMapper();
         
         final List<R> results;
+
+        String suffixDelimiter;
+
+        try {
+            suffixDelimiter = this.suffixDelimiter;
+        } catch (Exception e){
+            suffixDelimiter = "";
+        }
+
         if (queryBuilder != null) {
             //Merge the generated SQL with the base query template
             final StringBuilder partialSqlWhere = queryBuilder.sql;
             final Matcher queryMatcher = WHERE_PLACEHOLDER.matcher(this.queryTemplate);
             final String querySQL = queryMatcher.replaceAll(partialSqlWhere.toString());
-            
-            results = this.simpleJdbcTemplate.query(querySQL, rowMapper, queryBuilder.arguments.toArray());
+
+            if (suffixDelimiter.equals("") && queryBuilder.arguments.get(0).toString().indexOf(suffixDelimiter) < 0 ){
+                results = this.simpleJdbcTemplate.query(querySQL, rowMapper, queryBuilder.arguments.toArray());
+                this.logger.debug("results-256: " + results);
+            } else {
+                String array[] = getArguments(queryBuilder.arguments.get(0).toString(), suffixDelimiter);
+                results = this.simpleJdbcTemplate.query(querySQL, rowMapper, array);
+                this.logger.debug("results-260: " + results);
+            };
             
             if (this.logger.isDebugEnabled()) {
                 this.logger.debug("Executed '" + this.queryTemplate + "' with arguments " + queryBuilder.arguments + " and got results " + results);
@@ -243,6 +267,12 @@ public abstract class AbstractJdbcPersonAttributeDao<R> extends AbstractQueryPer
         }
 
         return this.parseAttributeMapFromResults(results, queryUserName);
+    }
+
+    public String[] getArguments(String arguments, String suffixDelimiter){
+        arguments = arguments.substring((arguments.indexOf(suffixDelimiter)+suffixDelimiter.length()), arguments.length());
+        this.logger.debug("results-argument: "+arguments);
+        return new String[] {arguments};
     }
 
     public Map<String, CaseCanonicalizationMode> getCaseInsensitiveDataAttributes() {
